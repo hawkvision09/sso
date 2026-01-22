@@ -1,0 +1,13 @@
+--- Starting Debug ---
+Email: catering-app-service@catering-app-483510.iam.gserviceaccount.com
+Raw Key Length: 1708
+Raw first 20: -----BEGIN PRIVATE K
+Processed Key Length: 1708
+Processed first 50: -----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w
+Processed last 50: KCCtz4aM8oLbczVC92WMQ==
+-----END PRIVATE KEY-----
+
+Line count: 28
+Auth Client created successfully.
+API Error: error:1E08010C:DECODER routines::unsupported
