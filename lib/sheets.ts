@@ -36,6 +36,7 @@ export const SHEET_NAMES = {
   SERVICES: 'Services',
   ENTITLEMENTS: 'Entitlements',
   OTPS: 'OTPs',
+  AUTH_CODES: 'AuthCodes',
 };
 
 const HEADERS = {
@@ -44,6 +45,7 @@ const HEADERS = {
   [SHEET_NAMES.SERVICES]: ['service_id', 'name', 'description', 'redirect_url', 'free_tier_enabled'],
   [SHEET_NAMES.ENTITLEMENTS]: ['entitlement_id', 'user_id', 'service_id', 'tier_level', 'valid_until'],
   [SHEET_NAMES.OTPS]: ['email', 'otp_code', 'expires_at', 'created_at'],
+  [SHEET_NAMES.AUTH_CODES]: ['code', 'user_id', 'service_id', 'expires_at', 'used'],
 };
 
 export const initializeSheets = async () => {

@@ -17,7 +17,7 @@ export const generateEntitlementId = () => uuidv4();
 
 // Sign JWT
 export const generateToken = (payload: object, expiresIn = '30d') => {
-  return jwt.sign(payload, SECRET, { expiresIn });
+  return jwt.sign(payload, SECRET, { expiresIn } as jwt.SignOptions);
 };
 
 // Verify JWT
@@ -33,3 +33,6 @@ export const verifyToken = (token: string) => {
 export const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
+
+// Generate Auth Code
+export const generateAuthCode = () => uuidv4();
