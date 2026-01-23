@@ -22,8 +22,8 @@ export async function POST(request: Request) {
     await sendEmail(email, 'Your SSO Login Code', `Your login code is: ${otp}\n\nThis code expires in 10 minutes.`);
 
     return NextResponse.json({ success: true, message: 'OTP sent' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
-    return NextResponse.json({ error: 'Failed to process login' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process login', details: error.message }, { status: 500 });
   }
 }
