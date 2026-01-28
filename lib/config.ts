@@ -1,7 +1,9 @@
-export const SERVICE_ACCOUNT_EMAIL = process.env.MASTER_SERVICE_ACCOUNT_EMAIL;
-export const SPREADSHEET_ID = process.env.MASTER_SPREADSHEET_ID;
+// Configuration module - centralized environment variable access
 
-const rawKey = process.env.MASTER_SERVICE_ACCOUNT_PRIVATE_KEY;
+export const SPREADSHEET_ID = process.env.SPREADSHEET_ID ?? '';
+export const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_EMAIL ?? '';
+
+const rawKey = process.env.SERVICE_ACCOUNT_KEY;
 let processedKey = rawKey;
 
 if (processedKey) {
@@ -29,3 +31,38 @@ if (processedKey) {
 }
 
 export const SERVICE_ACCOUNT_KEY = processedKey;
+
+export const JWT_SECRET = process.env.JWT_SECRET || '';
+
+export const SMTP_CONFIG = {
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  user: process.env.SMTP_USER || '',
+  pass: process.env.SMTP_PASS || '',
+};
+
+export const APP_CONFIG = {
+  name: process.env.APP_NAME || 'HawkVision SSO',
+  url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  sessionDurationDays: parseInt(process.env.SESSION_DURATION_DAYS || '30'),
+  otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10'),
+  authCodeExpirySeconds: parseInt(process.env.AUTH_CODE_EXPIRY_SECONDS || '60'),
+};
+
+// Validate critical configuration on startup
+export function validateConfig() {
+  const required = {
+    SPREADSHEET_ID,
+    SERVICE_ACCOUNT_EMAIL,
+    SERVICE_ACCOUNT_KEY,
+    JWT_SECRET,
+  };
+
+  const missing = Object.entries(required)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
