@@ -35,7 +35,7 @@ export const SHEET_NAMES = {
 const HEADERS = {
   [SHEET_NAMES.USERS]: ['user_id', 'email', 'role', 'created_at', 'status'],
   [SHEET_NAMES.SESSIONS]: ['session_id', 'user_id', 'device_info', 'created_at', 'expires_at', 'last_active_at', 'ip_address'],
-  [SHEET_NAMES.SERVICES]: ['service_id', 'name', 'description', 'redirect_url', 'free_tier_enabled'],
+  [SHEET_NAMES.SERVICES]: ['service_id', 'name', 'description', 'redirect_url', 'free_tier_enabled', 'image_url'],
   [SHEET_NAMES.ENTITLEMENTS]: ['entitlement_id', 'user_id', 'service_id', 'tier_level', 'valid_until'],
   [SHEET_NAMES.OTPS]: ['email', 'otp_code', 'expires_at', 'created_at'],
   [SHEET_NAMES.AUTH_CODES]: ['code', 'user_id', 'service_id', 'expires_at', 'used'],

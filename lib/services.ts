@@ -15,6 +15,7 @@ export interface Service {
   description: string;
   redirect_url: string;
   free_tier_enabled: string; // 'true' or 'false' in sheets
+  image_url?: string;
 }
 
 export interface AuthCode {
@@ -161,7 +162,8 @@ export async function createService(
   name: string,
   description: string,
   redirectUrl: string,
-  freeTierEnabled: boolean
+  freeTierEnabled: boolean,
+  imageUrl?: string
 ): Promise<Service> {
   const service: Service = {
     service_id: uuidv4(),
@@ -169,6 +171,7 @@ export async function createService(
     description,
     redirect_url: redirectUrl,
     free_tier_enabled: freeTierEnabled ? 'true' : 'false',
+    image_url: imageUrl || '',
   };
   
   await appendRow(SHEET_NAMES.SERVICES, [
@@ -177,6 +180,43 @@ export async function createService(
     service.description,
     service.redirect_url,
     service.free_tier_enabled,
+    service.image_url,
+  ]);
+  
+  return service;
+}
+
+// Update service (admin only)
+export async function updateService(
+  serviceId: string,
+  name: string,
+  description: string,
+  redirectUrl: string,
+  freeTierEnabled: boolean,
+  imageUrl?: string
+): Promise<Service> {
+  const rowIndex = await findRowIndexByColumn(SHEET_NAMES.SERVICES, 'service_id', serviceId);
+  
+  if (rowIndex === -1) {
+    throw new Error('Service not found');
+  }
+  
+  const service: Service = {
+    service_id: serviceId,
+    name,
+    description,
+    redirect_url: redirectUrl,
+    free_tier_enabled: freeTierEnabled ? 'true' : 'false',
+    image_url: imageUrl || '',
+  };
+  
+  await updateRow(SHEET_NAMES.SERVICES, `A${rowIndex + 1}`, [
+    service.service_id,
+    service.name,
+    service.description,
+    service.redirect_url,
+    service.free_tier_enabled,
+    service.image_url,
   ]);
   
   return service;

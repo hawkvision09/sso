@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { getAllServices, createService } from '@/lib/services';
+import { getAllServices, createService, updateService } from '@/lib/services';
 
 // Get all services
 export async function GET(request: NextRequest) {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { name, description, redirect_url, free_tier_enabled } = await request.json();
+    const { name, description, redirect_url, free_tier_enabled, image_url } = await request.json();
     
     if (!name || !redirect_url) {
       return NextResponse.json(
@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
       name,
       description || '',
       redirect_url,
-      free_tier_enabled || false
+      free_tier_enabled || false,
+      image_url || ''
     );
     
     return NextResponse.json({
@@ -98,6 +99,66 @@ export async function POST(request: NextRequest) {
     console.error('Create service error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create service' },
+      { status: 500 }
+    );
+  }
+}
+
+// Update existing service
+export async function PUT(request: NextRequest) {
+  try {
+    const token = request.cookies.get('sso_token')?.value;
+    
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+    
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
+    }
+    
+    // Handle both old (role) and new (roles) token formats
+    const roles = payload.roles || ((payload as any).role ? [(payload as any).role] : []);
+    if (!roles.includes('admin')) {
+      return NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+    
+    const { service_id, name, description, redirect_url, free_tier_enabled, image_url } = await request.json();
+    
+    if (!service_id || !name || !redirect_url) {
+      return NextResponse.json(
+        { error: 'Service ID, name and redirect URL are required' },
+        { status: 400 }
+      );
+    }
+    
+    const service = await updateService(
+      service_id,
+      name,
+      description || '',
+      redirect_url,
+      free_tier_enabled || false,
+      image_url || ''
+    );
+    
+    return NextResponse.json({
+      success: true,
+      service,
+    });
+  } catch (error: any) {
+    console.error('Update service error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to update service' },
       { status: 500 }
     );
   }

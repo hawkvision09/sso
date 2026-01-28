@@ -9,6 +9,7 @@ interface Service {
   description: string;
   redirect_url: string;
   free_tier_enabled: string;
+  image_url?: string;
 }
 
 export default function AdminPage() {
@@ -16,11 +17,13 @@ export default function AdminPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     redirect_url: "",
     free_tier_enabled: true,
+    image_url: "",
   });
 
   useEffect(() => {
@@ -47,30 +50,64 @@ export default function AdminPage() {
     }
   };
 
-  const handleCreateService = async (e: React.FormEvent) => {
+  const handleOpenCreateModal = () => {
+    setEditingService(null);
+    setFormData({
+      name: "",
+      description: "",
+      redirect_url: "",
+      free_tier_enabled: true,
+      image_url: "",
+    });
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (service: Service) => {
+    setEditingService(service);
+    setFormData({
+      name: service.name,
+      description: service.description,
+      redirect_url: service.redirect_url,
+      free_tier_enabled: service.free_tier_enabled === "true",
+      image_url: service.image_url || "",
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch("/api/admin/services", {
-        method: "POST",
+      const url = "/api/admin/services";
+      const method = editingService ? "PUT" : "POST";
+      const body = editingService
+        ? { service_id: editingService.service_id, ...formData }
+        : formData;
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create service");
+        throw new Error(
+          `Failed to ${editingService ? "update" : "create"} service`,
+        );
       }
 
       setShowModal(false);
+      setEditingService(null);
       setFormData({
         name: "",
         description: "",
         redirect_url: "",
         free_tier_enabled: true,
+        image_url: "",
       });
       fetchServices();
     } catch (error) {
-      console.error("Error creating service:", error);
-      alert("Failed to create service");
+      console.error("Error saving service:", error);
+      alert(`Failed to ${editingService ? "update" : "create"} service`);
     }
   };
 
@@ -131,7 +168,7 @@ export default function AdminPage() {
               Service Management
             </h2>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={handleOpenCreateModal}
               className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition-all"
             >
               + Add New Service
@@ -158,20 +195,37 @@ export default function AdminPage() {
                 >
                   {/* Service Header */}
                   <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-xl font-bold text-white">
-                      {service.name}
-                    </h3>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        service.free_tier_enabled === "true"
-                          ? "bg-green-500/20 text-green-300"
-                          : "bg-orange-500/20 text-orange-300"
-                      }`}
+                    <div className="flex items-center gap-3">
+                      {service.image_url && (
+                        <img
+                          src={service.image_url}
+                          alt={service.name}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      )}
+                      <div>
+                        <h3 className="text-xl font-bold text-white">
+                          {service.name}
+                        </h3>
+                        <span
+                          className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${
+                            service.free_tier_enabled === "true"
+                              ? "bg-green-500/20 text-green-300"
+                              : "bg-orange-500/20 text-orange-300"
+                          }`}
+                        >
+                          {service.free_tier_enabled === "true"
+                            ? "Free Tier"
+                            : "Paid Only"}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleOpenEditModal(service)}
+                      className="px-4 py-2 bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded-lg hover:bg-blue-500/30 transition-all text-sm font-semibold"
                     >
-                      {service.free_tier_enabled === "true"
-                        ? "Free Tier"
-                        : "Paid Only"}
-                    </span>
+                      ✏️ Edit
+                    </button>
                   </div>
 
                   <p className="text-white/70 text-sm mb-4">
@@ -259,10 +313,10 @@ export default function AdminPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-bold text-white mb-6">
-              Create New Service
+              {editingService ? "Edit Service" : "Create New Service"}
             </h2>
 
-            <form onSubmit={handleCreateService} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Service Name */}
               <div>
                 <label className="block text-sm font-semibold text-white/90 mb-2">
@@ -317,6 +371,26 @@ export default function AdminPage() {
                 </p>
               </div>
 
+              {/* Image URL */}
+              <div>
+                <label className="block text-sm font-semibold text-white/90 mb-2">
+                  Image URL (Logo)
+                </label>
+                <input
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) =>
+                    setFormData({ ...formData, image_url: e.target.value })
+                  }
+                  placeholder="https://example.com/logo.png"
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                />
+                <p className="mt-2 text-xs text-white/50">
+                  Optional: URL to your service logo/icon (recommended:
+                  512x512px)
+                </p>
+              </div>
+
               {/* Free Tier Checkbox */}
               <div className="flex items-center gap-3">
                 <input
@@ -349,7 +423,7 @@ export default function AdminPage() {
                   type="submit"
                   className="flex-1 px-5 py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all"
                 >
-                  Create Service
+                  {editingService ? "Update Service" : "Create Service"}
                 </button>
               </div>
             </form>
