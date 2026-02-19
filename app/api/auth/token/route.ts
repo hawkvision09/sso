@@ -1,71 +1,73 @@
-import { NextResponse } from 'next/server';
-import { findRowByColumn, updateRow, findRowIndexByColumn, SHEET_NAMES, getRows } from '@/lib/sheets';
-import { findRowsByColumn } from '@/lib/sheets';
+import { NextRequest, NextResponse } from 'next/server';
+import { validateAndConsumeAuthCode } from '@/lib/authCodes';
+import { getServiceById } from '@/lib/services';
+import { getUserById, generateToken } from '@/lib/auth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { code } = await request.json();
+    const { code, service_id, redirect_uri } = await request.json();
 
-    if (!code) {
-      return NextResponse.json({ error: 'Auth code is required' }, { status: 400 });
+    // Validate required parameters
+    if (!code || !service_id || !redirect_uri) {
+      return NextResponse.json(
+        { error: 'Missing required parameters: code, service_id, and redirect_uri' },
+        { status: 400 }
+      );
     }
 
-    // 1. Find Code
-    // We need to check if used. Using findRowByColumn gives us the first match.
-    // Ideally we should have a better DB, but here we scan.
-    const authCodeRow = await findRowByColumn(SHEET_NAMES.AUTH_CODES, 'code', code);
-
-    if (!authCodeRow) {
-       return NextResponse.json({ error: 'Invalid Code' }, { status: 400 });
+    // Validate service exists
+    const service = await getServiceById(service_id);
+    if (!service) {
+      return NextResponse.json(
+        { error: 'Invalid service_id' },
+        { status: 400 }
+      );
     }
 
-    // 2. Validate Code
-    if (authCodeRow.used === 'TRUE') {
-        return NextResponse.json({ error: 'Code already used' }, { status: 400 });
+    // Validate and consume authorization code
+    const result = await validateAndConsumeAuthCode(code, service_id, redirect_uri);
+
+    if (!result.valid) {
+      return NextResponse.json(
+        { error: result.error || 'Invalid authorization code' },
+        { status: 400 }
+      );
     }
 
-    if (Date.now() > Number(authCodeRow.expires_at)) {
-        return NextResponse.json({ error: 'Code expired' }, { status: 400 });
-    }
-
-    // 3. Mark Code as Used
-    const rowIndex = await findRowIndexByColumn(SHEET_NAMES.AUTH_CODES, 'code', code);
-    if (rowIndex > -1) {
-        // Update the row. Original: code, user_id, service_id, expires_at, used
-        // We set used to TRUE
-        const updatedRow = [
-             authCodeRow.code,
-             authCodeRow.user_id,
-             authCodeRow.service_id,
-             authCodeRow.expires_at,
-             'TRUE'
-        ];
-        // Only updating columns A-E
-        await updateRow(SHEET_NAMES.AUTH_CODES, `A${rowIndex}:E${rowIndex}`, updatedRow);
-    } else {
-         // Race condition safeguard
-         return NextResponse.json({ error: 'System Error: Code not found during update' }, { status: 500 });
-    }
-
-    // 4. Fetch User Details
-    const user = await findRowByColumn(SHEET_NAMES.USERS, 'user_id', authCodeRow.user_id);
-    
+    // Get user details
+    const user = await getUserById(result.userId!);
     if (!user) {
-        return NextResponse.json({ error: 'User not found' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
     }
 
-    // 5. Return User Profile
-    return NextResponse.json({
-        success: true,
-        user: {
-            user_id: user.user_id,
-            email: user.email,
-            role: user.role
-        }
+    // Generate access token (JWT)
+    const accessToken = generateToken({
+      session_id: '', // Not needed for SSO tokens
+      user_id: user.user_id,
+      email: user.email,
+      roles: user.roles,
     });
 
-  } catch (error) {
-    console.error('Token Exchange Error:', error);
-    return NextResponse.json({ error: 'Failed to exchange token' }, { status: 500 });
+    // Return token and user info
+    return NextResponse.json({
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: 3600, // 1 hour
+      user: {
+        user_id: user.user_id,
+        email: user.email,
+        roles: user.roles,
+        status: user.status,
+      },
+    });
+  } catch (error: any) {
+    console.error('Token exchange error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
