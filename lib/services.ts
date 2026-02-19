@@ -40,6 +40,10 @@ export async function getService(serviceId: string): Promise<Service | null> {
   return service ? (service as Service) : null;
 }
 
+// Alias for consistency
+export const getServiceById = getService;
+
+
 // Check if user has entitlement for service
 export async function getUserEntitlement(
   userId: string, 

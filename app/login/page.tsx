@@ -61,9 +61,13 @@ export default function LoginPage() {
         throw new Error(data.error || "Failed to verify OTP");
       }
 
-      if (serviceId) {
-        window.location.href = `/authorize?service_id=${serviceId}`;
+      // Check if there's a return URL (from SSO flow)
+      const returnUrl = searchParams.get("return_url");
+      if (returnUrl) {
+        // Redirect to the return URL (which will be /authorize with all params)
+        window.location.href = returnUrl;
       } else {
+        // No return URL - direct login to SSO dashboard
         router.push("/dashboard");
       }
     } catch (err: any) {

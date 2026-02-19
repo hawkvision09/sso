@@ -33,14 +33,7 @@ export default function AdminPage() {
   const fetchServices = async () => {
     try {
       const response = await fetch("/api/admin/services");
-      if (!response.ok) {
-        if (response.status === 403) {
-          alert("Admin access required");
-          router.push("/dashboard");
-          return;
-        }
-        throw new Error("Failed to fetch services");
-      }
+      if (!response.ok) throw new Error("Failed to fetch services");
       const data = await response.json();
       setServices(data.services);
     } catch (error) {
@@ -118,189 +111,154 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white">Loading...</p>
+          <p className="text-white">Loading services...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative">
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
+    <>
+      <main className="px-12 py-12 max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-white">Service Management</h2>
+          <button
+            onClick={handleOpenCreateModal}
+            className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition-all"
+          >
+            + Add New Service
+          </button>
+        </div>
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen">
-        {/* Header */}
-        <header className="flex justify-between items-center px-12 py-6 bg-white/5 backdrop-blur-2xl border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl">⚙️</span>
-            <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/admin/users")}
-              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-purple-800 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all"
-            >
-              👥 User Management
-            </button>
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="px-5 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white font-semibold hover:bg-white/15 transition-all"
-            >
-              ← Back to Dashboard
-            </button>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="px-12 py-12 max-w-7xl mx-auto">
-          {/* Page Header */}
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-bold text-white">
-              Service Management
-            </h2>
-            <button
-              onClick={handleOpenCreateModal}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition-all"
-            >
-              + Add New Service
-            </button>
-          </div>
-
-          {/* Services Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {services.length === 0 ? (
-              <div className="col-span-full text-center py-20">
-                <div className="text-7xl mb-4">📦</div>
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  No Services Yet
-                </h3>
-                <p className="text-white/60">
-                  Create your first service to get started
-                </p>
-              </div>
-            ) : (
-              services.map((service) => (
-                <div
-                  key={service.service_id}
-                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 hover:border-white/20 hover:shadow-2xl transition-all"
-                >
-                  {/* Service Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      {service.image_url && (
-                        <img
-                          src={service.image_url}
-                          alt={service.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      )}
-                      <div>
-                        <h3 className="text-xl font-bold text-white">
-                          {service.name}
-                        </h3>
-                        <span
-                          className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${
-                            service.free_tier_enabled === "true"
-                              ? "bg-green-500/20 text-green-300"
-                              : "bg-orange-500/20 text-orange-300"
-                          }`}
-                        >
-                          {service.free_tier_enabled === "true"
-                            ? "Free Tier"
-                            : "Paid Only"}
-                        </span>
-                      </div>
+        {/* Services Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {services.length === 0 ? (
+            <div className="col-span-full text-center py-20">
+              <div className="text-7xl mb-4">📦</div>
+              <h3 className="text-2xl font-bold text-white mb-2">
+                No Services Yet
+              </h3>
+              <p className="text-white/60">
+                Create your first service to get started
+              </p>
+            </div>
+          ) : (
+            services.map((service) => (
+              <div
+                key={service.service_id}
+                className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 hover:border-white/20 hover:shadow-2xl transition-all"
+              >
+                {/* Service Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    {service.image_url && (
+                      <img
+                        src={service.image_url}
+                        alt={service.name}
+                        className="w-12 h-12 rounded-lg object-cover"
+                      />
+                    )}
+                    <div>
+                      <h3 className="text-xl font-bold text-white">
+                        {service.name}
+                      </h3>
+                      <span
+                        className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${
+                          service.free_tier_enabled === "true"
+                            ? "bg-green-500/20 text-green-300"
+                            : "bg-orange-500/20 text-orange-300"
+                        }`}
+                      >
+                        {service.free_tier_enabled === "true"
+                          ? "Free Tier"
+                          : "Paid Only"}
+                      </span>
                     </div>
-                    <button
-                      onClick={() => handleOpenEditModal(service)}
-                      className="px-4 py-2 bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded-lg hover:bg-blue-500/30 transition-all text-sm font-semibold"
-                    >
-                      ✏️ Edit
-                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleOpenEditModal(service)}
+                    className="px-4 py-2 bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded-lg hover:bg-blue-500/30 transition-all text-sm font-semibold"
+                  >
+                    ✏️ Edit
+                  </button>
+                </div>
+
+                <p className="text-white/70 text-sm mb-4">
+                  {service.description || "No description"}
+                </p>
+
+                {/* Service Details */}
+                <div className="space-y-3">
+                  {/* Service ID */}
+                  <div>
+                    <span className="text-xs text-white/50 font-semibold">
+                      Service ID:
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 px-3 py-2 bg-black/30 rounded text-xs text-white/80 font-mono overflow-x-auto">
+                        {service.service_id}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(service.service_id)}
+                        className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-all"
+                        title="Copy to clipboard"
+                      >
+                        📋
+                      </button>
+                    </div>
                   </div>
 
-                  <p className="text-white/70 text-sm mb-4">
-                    {service.description || "No description"}
-                  </p>
-
-                  {/* Service Details */}
-                  <div className="space-y-3">
-                    {/* Service ID */}
-                    <div>
-                      <span className="text-xs text-white/50 font-semibold">
-                        Service ID:
-                      </span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="flex-1 px-3 py-2 bg-black/30 rounded text-xs text-white/80 font-mono overflow-x-auto">
-                          {service.service_id}
-                        </code>
-                        <button
-                          onClick={() => copyToClipboard(service.service_id)}
-                          className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-all"
-                          title="Copy to clipboard"
-                        >
-                          📋
-                        </button>
-                      </div>
+                  {/* Redirect URL */}
+                  <div>
+                    <span className="text-xs text-white/50 font-semibold">
+                      Redirect URL:
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 px-3 py-2 bg-black/30 rounded text-xs text-white/80 font-mono overflow-x-auto">
+                        {service.redirect_url}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(service.redirect_url)}
+                        className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-all"
+                        title="Copy to clipboard"
+                      >
+                        📋
+                      </button>
                     </div>
+                  </div>
 
-                    {/* Redirect URL */}
-                    <div>
-                      <span className="text-xs text-white/50 font-semibold">
-                        Redirect URL:
-                      </span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="flex-1 px-3 py-2 bg-black/30 rounded text-xs text-white/80 font-mono overflow-x-auto">
-                          {service.redirect_url}
-                        </code>
-                        <button
-                          onClick={() => copyToClipboard(service.redirect_url)}
-                          className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-all"
-                          title="Copy to clipboard"
-                        >
-                          📋
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Authorization URL */}
-                    <div>
-                      <span className="text-xs text-white/50 font-semibold">
-                        Authorization URL:
-                      </span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="flex-1 px-3 py-2 bg-black/30 rounded text-xs text-white/80 font-mono overflow-x-auto">
-                          {`${typeof window !== "undefined" ? window.location.origin : ""}/authorize?service_id=${service.service_id}`}
-                        </code>
-                        <button
-                          onClick={() =>
-                            copyToClipboard(
-                              `${window.location.origin}/authorize?service_id=${service.service_id}`,
-                            )
-                          }
-                          className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-all"
-                          title="Copy to clipboard"
-                        >
-                          📋
-                        </button>
-                      </div>
+                  {/* Authorization URL */}
+                  <div>
+                    <span className="text-xs text-white/50 font-semibold">
+                      Authorization URL:
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 px-3 py-2 bg-black/30 rounded text-xs text-white/80 font-mono overflow-x-auto">
+                        {`${typeof window !== "undefined" ? window.location.origin : ""}/authorize?service_id=${service.service_id}`}
+                      </code>
+                      <button
+                        onClick={() =>
+                          copyToClipboard(
+                            `${window.location.origin}/authorize?service_id=${service.service_id}`,
+                          )
+                        }
+                        className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-all"
+                        title="Copy to clipboard"
+                      >
+                        📋
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </main>
-      </div>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
 
       {/* Modal */}
       {showModal && (
@@ -430,6 +388,6 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
