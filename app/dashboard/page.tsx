@@ -21,16 +21,30 @@ interface Service {
   image_url?: string;
 }
 
+interface StorageStatus {
+  connected: boolean;
+  provider: string | null;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [services, setServices] = useState<Service[]>([]);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus>({
+    connected: false,
+    provider: null,
+  });
+  const [storageLoading, setStorageLoading] = useState(true);
+  const [storageError, setStorageError] = useState("");
+  const [storageBusy, setStorageBusy] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [servicesLoading, setServicesLoading] = useState(true);
 
   useEffect(() => {
     fetchUser();
     fetchServices();
+    fetchStorageStatus();
   }, []);
 
   const fetchUser = async () => {
@@ -60,6 +74,79 @@ export default function DashboardPage() {
       console.error("Failed to fetch services:", error);
     } finally {
       setServicesLoading(false);
+    }
+  };
+
+  const fetchStorageStatus = async () => {
+    try {
+      const response = await fetch("/api/storage/status");
+      if (response.ok) {
+        const data = await response.json();
+        setStorageStatus({
+          connected: Boolean(data.connected),
+          provider: data.provider || null,
+        });
+        setStorageError("");
+      }
+    } catch (error) {
+      setStorageError("Failed to fetch storage status");
+    } finally {
+      setStorageLoading(false);
+    }
+  };
+
+  const connectProvider = async (provider: "google" | "onedrive") => {
+    try {
+      setStorageBusy(true);
+      setStorageError("");
+
+      const response = await fetch(`/api/storage/connect/${provider}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ returnTo: "/dashboard" }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.connectUrl) {
+        throw new Error(data.error || `Failed to start ${provider} connection`);
+      }
+
+      setShowProviderPicker(false);
+      window.location.href = data.connectUrl;
+    } catch (error: unknown) {
+      setStorageError(
+        error instanceof Error ? error.message : "Failed to connect storage provider"
+      );
+    } finally {
+      setStorageBusy(false);
+    }
+  };
+
+  const disconnectStorage = async () => {
+    if (!confirm("Disconnect current storage provider? You must disconnect before linking another provider.")) {
+      return;
+    }
+
+    try {
+      setStorageBusy(true);
+      setStorageError("");
+
+      const response = await fetch("/api/storage/disconnect", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to disconnect storage");
+      }
+
+      await fetchStorageStatus();
+    } catch (error: unknown) {
+      setStorageError(
+        error instanceof Error ? error.message : "Failed to disconnect storage"
+      );
+    } finally {
+      setStorageBusy(false);
     }
   };
 
@@ -176,6 +263,80 @@ export default function DashboardPage() {
                   ✓ Secure token storage
                 </div>
               </div>
+            </div>
+
+            {/* Storage Card */}
+            <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 hover:transform hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl transition-all">
+              <div className="text-4xl mb-3">💾</div>
+              <h3 className="text-xl font-bold text-white mb-3">Storage</h3>
+              <p className="text-white/70 text-sm leading-relaxed mb-3">
+                Link one storage provider. Apps will use SSO as storage gateway.
+              </p>
+
+              {storageLoading ? (
+                <p className="text-xs text-white/60">Loading storage status...</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-2 bg-white/5 rounded-md text-xs text-white/80">
+                    Status: {storageStatus.connected ? "Connected" : "Not Connected"}
+                  </div>
+                  <div className="p-2 bg-white/5 rounded-md text-xs text-white/80">
+                    Provider: {storageStatus.provider || "None"}
+                  </div>
+
+                  {!storageStatus.connected ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setStorageError("");
+                          setShowProviderPicker((prev) => !prev);
+                        }}
+                        disabled={storageBusy}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-green-800 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
+                      >
+                        {showProviderPicker ? "Close Provider Picker" : "Connect Storage"}
+                      </button>
+
+                      {showProviderPicker && (
+                        <div className="p-3 bg-white/5 border border-white/10 rounded-lg space-y-2">
+                          <p className="text-xs text-white/70">Choose one provider:</p>
+                          <button
+                            onClick={() => connectProvider("google")}
+                            disabled={storageBusy}
+                            className="w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-800 text-white text-sm font-semibold rounded-md disabled:opacity-50"
+                          >
+                            {storageBusy ? "Redirecting..." : "Google Drive"}
+                          </button>
+                          <button
+                            disabled
+                            className="w-full px-3 py-2 bg-white/10 text-white/60 text-sm font-semibold rounded-md cursor-not-allowed"
+                          >
+                            OneDrive (Coming Soon)
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={disconnectStorage}
+                      disabled={storageBusy}
+                      className="w-full px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
+                    >
+                      {storageBusy ? "Disconnecting..." : "Disconnect Storage"}
+                    </button>
+                  )}
+
+                  <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-xs text-yellow-200">
+                    One provider only. Disconnect current provider before switching.
+                  </div>
+
+                  {storageError && (
+                    <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-md text-xs text-red-200">
+                      {storageError}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Admin Panel Card (Conditional) */}
