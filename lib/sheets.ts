@@ -30,6 +30,9 @@ export const SHEET_NAMES = {
   ENTITLEMENTS: 'Entitlements',
   OTPS: 'OTPs',
   AUTH_CODES: 'AuthCodes',
+  USER_STORAGE: 'UserStorage',
+  USER_STORAGE_APPS: 'UserStorageApps',
+  PROVIDER_CONFIG: 'ProviderConfig',
 };
 
 const HEADERS = {
@@ -39,6 +42,9 @@ const HEADERS = {
   [SHEET_NAMES.ENTITLEMENTS]: ['entitlement_id', 'user_id', 'service_id', 'tier_level', 'valid_until'],
   [SHEET_NAMES.OTPS]: ['email', 'otp_code', 'expires_at', 'created_at'],
   [SHEET_NAMES.AUTH_CODES]: ['code', 'user_id', 'service_id', 'expires_at', 'used'],
+  [SHEET_NAMES.USER_STORAGE]: ['user_id', 'provider', 'access_token_enc', 'refresh_token_enc', 'token_expires_at', 'root_folder_id', 'status', 'created_at', 'updated_at'],
+  [SHEET_NAMES.USER_STORAGE_APPS]: ['user_id', 'app_name', 'container_id', 'schema_version', 'created_at', 'updated_at'],
+  [SHEET_NAMES.PROVIDER_CONFIG]: ['provider', 'enabled', 'client_id', 'client_secret', 'redirect_uri', 'scopes', 'root_folder', 'updated_at'],
 };
 
 export const initializeSheets = async () => {
