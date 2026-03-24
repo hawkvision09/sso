@@ -159,8 +159,12 @@ export default function DashboardPage() {
     }
   };
 
-  const handleServiceClick = (serviceId: string) => {
-    window.location.href = `/authorize?service_id=${serviceId}`;
+  const handleServiceClick = (service: Service) => {
+    const params = new URLSearchParams({
+      service_id: service.service_id,
+      redirect_uri: service.redirect_url,
+    });
+    window.location.href = `/authorize?${params.toString()}`;
   };
 
   const getServiceIcon = (name: string) => {
@@ -381,7 +385,7 @@ export default function DashboardPage() {
                 {services.map((service) => (
                   <button
                     key={service.service_id}
-                    onClick={() => handleServiceClick(service.service_id)}
+                    onClick={() => handleServiceClick(service)}
                     className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 text-left hover:transform hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl hover:bg-white/10 transition-all group"
                   >
                     <div className="flex items-start gap-4">
