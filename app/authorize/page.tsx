@@ -17,7 +17,7 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
   const { service_id, redirect_uri, state } = params;
 
   // Validate required parameters
-  if (!service_id || !redirect_uri) {
+  if (!service_id) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] p-6">
         <div className="bg-white/5 backdrop-blur-2xl border border-red-500/30 rounded-2xl p-8 max-w-md w-full text-center">
@@ -26,32 +26,13 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
             Invalid Request
           </h2>
           <p className="text-red-300 mb-6">
-            Missing required parameters: service_id and redirect_uri
+            Missing required parameter: service_id
           </p>
         </div>
       </div>
     );
   }
 
-  // Check if user is authenticated
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sso_token")?.value;
-
-  if (!token) {
-    // Not logged in - redirect to login with return URL
-    const returnUrl = `/authorize?service_id=${service_id}&redirect_uri=${encodeURIComponent(redirect_uri)}${state ? `&state=${state}` : ""}`;
-    redirect(`/login?return_url=${encodeURIComponent(returnUrl)}`);
-  }
-
-  // Verify token
-  const payload = verifyToken(token);
-  if (!payload) {
-    // Invalid token - redirect to login
-    const returnUrl = `/authorize?service_id=${service_id}&redirect_uri=${encodeURIComponent(redirect_uri)}${state ? `&state=${state}` : ""}`;
-    redirect(`/login?return_url=${encodeURIComponent(returnUrl)}`);
-  }
-
-  // Validate service exists
   const service = await getServiceById(service_id);
   if (!service) {
     return (
@@ -69,8 +50,43 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
     );
   }
 
+  const effectiveRedirectUri = redirect_uri || service.redirect_url;
+  if (!effectiveRedirectUri) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] p-6">
+        <div className="bg-white/5 backdrop-blur-2xl border border-red-500/30 rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-white mb-4">
+            Invalid Request
+          </h2>
+          <p className="text-red-300 mb-6">
+            No redirect URI configured for this service.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is authenticated
+  const cookieStore = await cookies();
+  const token = cookieStore.get("sso_token")?.value;
+
+  if (!token) {
+    // Not logged in - redirect to login with return URL
+    const returnUrl = `/authorize?service_id=${service_id}&redirect_uri=${encodeURIComponent(effectiveRedirectUri)}${state ? `&state=${state}` : ""}`;
+    redirect(`/login?return_url=${encodeURIComponent(returnUrl)}`);
+  }
+
+  // Verify token
+  const payload = verifyToken(token);
+  if (!payload) {
+    // Invalid token - redirect to login
+    const returnUrl = `/authorize?service_id=${service_id}&redirect_uri=${encodeURIComponent(effectiveRedirectUri)}${state ? `&state=${state}` : ""}`;
+    redirect(`/login?return_url=${encodeURIComponent(returnUrl)}`);
+  }
+
   // Validate redirect_uri matches registered URL
-  if (service.redirect_url !== redirect_uri) {
+  if (redirect_uri && service.redirect_url !== redirect_uri) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] p-6">
         <div className="bg-white/5 backdrop-blur-2xl border border-red-500/30 rounded-2xl p-8 max-w-md w-full text-center">
@@ -106,10 +122,10 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
   }
 
   // Generate authorization code
-  const code = await createAuthCode(payload.user_id, service_id, redirect_uri);
+  const code = await createAuthCode(payload.user_id, service_id, effectiveRedirectUri);
 
   // Build redirect URL with code and state
-  const redirectUrl = new URL(redirect_uri);
+  const redirectUrl = new URL(effectiveRedirectUri);
   redirectUrl.searchParams.set("code", code);
   if (state) {
     redirectUrl.searchParams.set("state", state);
