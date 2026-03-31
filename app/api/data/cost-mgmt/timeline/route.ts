@@ -53,3 +53,31 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: `Failed to upsert timeline cache: ${error.message}` }, { status: 500 });
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const resolved = await resolveCostMgmtRequestContext(request);
+    if (!resolved.ok) return resolved.response;
+
+    const { accessToken, spreadsheetId } = resolved.context;
+    const service = new CostMgmtService(accessToken, spreadsheetId);
+
+    const productIdFromQuery = request.nextUrl.searchParams.get('product_id');
+    let productId = productIdFromQuery ? String(productIdFromQuery).trim() : '';
+
+    if (!productId) {
+      const body = await request.json().catch(() => ({} as any));
+      productId = String(body?.product_id || '').trim();
+    }
+
+    if (!productId) {
+      return NextResponse.json({ error: 'product_id is required' }, { status: 400 });
+    }
+
+    const result = await service.pruneTimelineCache(productId);
+    return NextResponse.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('Failed to prune timeline cache:', error);
+    return NextResponse.json({ error: `Failed to prune timeline cache: ${error.message}` }, { status: 500 });
+  }
+}

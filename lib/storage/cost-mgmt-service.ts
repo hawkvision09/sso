@@ -136,6 +136,10 @@ const SUMMARY_COLUMNS = [
   'event_count',
 ];
 
+const CALCULATED_TAB = 'calculated_data';
+const CALCULATED_COLUMNS = [...SUMMARY_COLUMNS];
+const TIMELINE_MAX_POINTS = 24;
+
 const TIMELINE_TAB = 'timeline_cache';
 const TIMELINE_COLUMNS = [
   'product_id',
@@ -181,6 +185,10 @@ export class CostMgmtService {
       requests.push({ addSheet: { properties: { title: SUMMARY_TAB } } });
     }
 
+    if (!sheetNames.has(CALCULATED_TAB)) {
+      requests.push({ addSheet: { properties: { title: CALCULATED_TAB } } });
+    }
+
     if (!sheetNames.has(TIMELINE_TAB)) {
       requests.push({ addSheet: { properties: { title: TIMELINE_TAB } } });
     }
@@ -189,7 +197,14 @@ export class CostMgmtService {
       const title = sheet.properties?.title;
       const sheetId = sheet.properties?.sheetId;
       if (!sheetId) continue;
-      if (title !== EVENTS_TAB && title !== PRODUCTS_TAB && title !== FUNDS_TAB && title !== SUMMARY_TAB && title !== TIMELINE_TAB) {
+      if (
+        title !== EVENTS_TAB &&
+        title !== PRODUCTS_TAB &&
+        title !== FUNDS_TAB &&
+        title !== SUMMARY_TAB &&
+        title !== CALCULATED_TAB &&
+        title !== TIMELINE_TAB
+      ) {
         requests.push({ deleteSheet: { sheetId } });
       }
     }
@@ -231,9 +246,90 @@ export class CostMgmtService {
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
+      range: `${CALCULATED_TAB}!A1:M1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [CALCULATED_COLUMNS] },
+    });
+
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
       range: `${TIMELINE_TAB}!A1:G1`,
       valueInputOption: 'RAW',
       requestBody: { values: [TIMELINE_COLUMNS] },
+    });
+
+    await this.ensureEventMonthlyAmountFormula();
+  }
+
+  private async ensureEventMonthlyAmountFormula(): Promise<void> {
+    const monthlyAmountHeader = 'monthly_amount';
+    const monthlyAmountFormula = `=ARRAYFORMULA(IF(A2:A=\"\",\"\",IF(Q2:Q<>\"active\",0,IF(I2:I>TEXT(TODAY(),\"yyyy-mm-dd\"),0,IF((J2:J<>\"\")*(J2:J<TEXT(TODAY(),\"yyyy-mm-dd\")),0,IF((F2:F=\"recurring\")+(F2:F=\"dynamic\"),IF(K2:K=\"yearly\",N(G2:G)/12,N(G2:G)),IF(F2:F=\"one_time\",IF(((YEAR(TODAY())-YEAR(IFERROR(DATEVALUE(I2:I),TODAY())))*12+MONTH(TODAY())-MONTH(IFERROR(DATEVALUE(I2:I),TODAY())))<IF(IFERROR(N(L2:L),1)<=0,1,IFERROR(N(L2:L),1)),IF(((YEAR(TODAY())-YEAR(IFERROR(DATEVALUE(I2:I),TODAY())))*12+MONTH(TODAY())-MONTH(IFERROR(DATEVALUE(I2:I),TODAY())))>=0,N(G2:G)/IF(IFERROR(N(L2:L),1)<=0,1,IFERROR(N(L2:L),1)),0),0),0)))))))`;
+
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `${EVENTS_TAB}!R1`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[monthlyAmountHeader]],
+      },
+    });
+
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `${EVENTS_TAB}!R2`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[monthlyAmountFormula]],
+      },
+    });
+  }
+
+  private calculatedSummaryFormulaRow(productId: string, rowNumber: number): string[] {
+    const productRef = `$A${rowNumber}`;
+
+    return [
+      productId,
+      `=ROUND(SUMIFS(cost_events!$R$2:$R,cost_events!$B$2:$B,${productRef}),2)`,
+      `=ROUND(SUMIFS(cost_events!$R$2:$R,cost_events!$B$2:$B,${productRef},cost_events!$E$2:$E,\"team\"),2)`,
+      `=ROUND(SUMIFS(cost_events!$R$2:$R,cost_events!$B$2:$B,${productRef},cost_events!$E$2:$E,\"infra\"),2)`,
+      `=ROUND(SUMIFS(cost_events!$R$2:$R,cost_events!$B$2:$B,${productRef},cost_events!$E$2:$E,\"tool\"),2)`,
+      `=ROUND(SUMIFS(cost_events!$R$2:$R,cost_events!$B$2:$B,${productRef},cost_events!$E$2:$E,\"hardware\"),2)`,
+      `=ROUND(SUMIFS(cost_events!$R$2:$R,cost_events!$B$2:$B,${productRef},cost_events!$E$2:$E,\"other\"),2)`,
+      `=COUNT(FILTER(cost_events!$A$2:$A,cost_events!$B$2:$B=${productRef},cost_events!$E$2:$E=\"team\",cost_events!$F$2:$F=\"recurring\",cost_events!$R$2:$R>0))`,
+      `=IF(H${rowNumber}>0,ROUND(C${rowNumber}/H${rowNumber}),0)`,
+      `=ROUND(B${rowNumber}/2)`,
+      `=ROUND(B${rowNumber}/4)`,
+      '=NOW()',
+      `=COUNTIFS(cost_events!$B$2:$B,${productRef},cost_events!$Q$2:$Q,\"active\")`,
+    ];
+  }
+
+
+  async ensureCalculatedSummaryRow(productId: string): Promise<void> {
+    await this.ensureSheets();
+
+    const normalizedProductId = String(productId || '').trim();
+    if (!normalizedProductId) return;
+
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${CALCULATED_TAB}!A:A`,
+    });
+
+    const idColumn = response.data.values || [];
+    const existingRowIndex = idColumn.findIndex((row: any[]) => String(row[0] || '').trim() === normalizedProductId);
+    if (existingRowIndex !== -1) return;
+
+    const rowNumber = idColumn.length + 1;
+    const row = this.calculatedSummaryFormulaRow(normalizedProductId, rowNumber);
+
+    await this.sheets.spreadsheets.values.append({
+      spreadsheetId: this.spreadsheetId,
+      range: `${CALCULATED_TAB}!A:M`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [row],
+      },
     });
   }
 
@@ -311,6 +407,291 @@ export class CostMgmtService {
       .trim();
   }
 
+  private parseYearMonthIndex(month: string): number | null {
+    const m = String(month || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(m)) return null;
+
+    const [year, mon] = m.split('-').map((value) => parseInt(value, 10));
+    if (!Number.isFinite(year) || !Number.isFinite(mon) || mon < 1 || mon > 12) {
+      return null;
+    }
+
+    return year * 12 + (mon - 1);
+  }
+
+  private toYearMonth(index: number): string {
+    const year = Math.floor(index / 12);
+    const month = (index % 12) + 1;
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  private toMonthLabel(index: number): string {
+    const year = Math.floor(index / 12);
+    const month = index % 12;
+    return new Date(year, month, 1).toLocaleDateString('en-IN', {
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  private monthStart(index: number): Date {
+    const year = Math.floor(index / 12);
+    const month = index % 12;
+    return new Date(year, month, 1);
+  }
+
+  private getTimelineRetentionRange(): { minIndex: number; maxIndex: number } {
+    const now = new Date();
+    const currentIndex = now.getFullYear() * 12 + now.getMonth();
+    const lastClosedIndex = currentIndex - 1;
+
+    if (lastClosedIndex < 0) {
+      return { minIndex: 0, maxIndex: -1 };
+    }
+
+    return {
+      minIndex: Math.max(0, lastClosedIndex - (TIMELINE_MAX_POINTS - 1)),
+      maxIndex: lastClosedIndex,
+    };
+  }
+
+  private normalizeTimelinePoints(points: TimelinePoint[]): TimelinePoint[] {
+    const { minIndex, maxIndex } = this.getTimelineRetentionRange();
+
+    const deduped = new Map<string, TimelinePoint>();
+    for (const point of points) {
+      const month = String(point.month || '').trim();
+      const monthIndex = this.parseYearMonthIndex(month);
+      if (monthIndex === null) continue;
+      if (monthIndex < minIndex || monthIndex > maxIndex) continue;
+
+      deduped.set(month, {
+        month,
+        label: String(point.label || month).trim() || month,
+        burn_rate: Number.isFinite(Number(point.burn_rate)) ? Number(point.burn_rate) : 0,
+        // Retention window contains only completed months.
+        is_forecast: false,
+      });
+    }
+
+    return Array.from(deduped.values())
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-TIMELINE_MAX_POINTS);
+  }
+
+  private eventMonthlyCostForIndex(event: CostEvent, targetIndex: number): number {
+    if (event.status !== 'active') return 0;
+    if (!event.start_date) return 0;
+
+    const startDate = new Date(event.start_date);
+    if (Number.isNaN(startDate.getTime())) return 0;
+
+    const targetDate = this.monthStart(targetIndex);
+    const startMonthIndex = startDate.getFullYear() * 12 + startDate.getMonth();
+
+    if (targetIndex < startMonthIndex) return 0;
+
+    if (event.end_date) {
+      const endDate = new Date(event.end_date);
+      if (!Number.isNaN(endDate.getTime())) {
+        const endMonthIndex = endDate.getFullYear() * 12 + endDate.getMonth();
+        if (targetIndex > endMonthIndex) return 0;
+      }
+    }
+
+    if (event.cost_type === 'recurring' || event.cost_type === 'dynamic') {
+      if (event.recurrence === 'yearly') return Number(event.amount || 0) / 12;
+      return Number(event.amount || 0);
+    }
+
+    if (event.cost_type === 'one_time') {
+      const amortMonths = Math.max(1, Number(event.amortization_months || 1));
+      const monthDiff = targetIndex - startMonthIndex;
+      if (monthDiff >= 0 && monthDiff < amortMonths) {
+        return Number(event.amount || 0) / amortMonths;
+      }
+      return 0;
+    }
+
+    return 0;
+  }
+
+  private calculateMonthlyBurnForIndex(events: CostEvent[], targetIndex: number): number {
+    const total = events.reduce((sum, event) => sum + this.eventMonthlyCostForIndex(event, targetIndex), 0);
+    return Math.round(total * 100) / 100;
+  }
+
+  private calculateMonthlyEventCount(events: CostEvent[], targetIndex: number): number {
+    return events.filter((event) => this.eventMonthlyCostForIndex(event, targetIndex) > 0).length;
+  }
+
+  private async getJoinMonthIndex(productId: string, events: CostEvent[]): Promise<number | null> {
+    const products = await this.getAllProducts();
+    const product = products.find((item) => String(item.product_id || '').trim() === productId);
+
+    const candidateDates: Date[] = [];
+
+    if (product?.created_at) {
+      const created = new Date(product.created_at);
+      if (!Number.isNaN(created.getTime())) candidateDates.push(created);
+    }
+
+    for (const event of events) {
+      if (event.created_at) {
+        const created = new Date(event.created_at);
+        if (!Number.isNaN(created.getTime())) candidateDates.push(created);
+      }
+    }
+
+    // Fallback for legacy rows without created_at.
+    if (candidateDates.length === 0) {
+      for (const event of events) {
+        const start = new Date(event.start_date || '');
+        if (!Number.isNaN(start.getTime())) candidateDates.push(start);
+      }
+    }
+
+    if (candidateDates.length === 0) return null;
+
+    const joinDate = new Date(Math.min(...candidateDates.map((d) => d.getTime())));
+    return joinDate.getFullYear() * 12 + joinDate.getMonth();
+  }
+
+  private rowsAreEqual(a: any[][], b: any[][]): boolean {
+    if (a.length !== b.length) return false;
+
+    for (let i = 0; i < a.length; i += 1) {
+      if ((a[i] || []).join('||') !== (b[i] || []).join('||')) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  async pruneTimelineCache(productId: string): Promise<{ product_id: string; kept: number; removed: number; added: number }> {
+    await this.ensureSheets();
+
+    const normalizedProductId = String(productId || '').trim();
+    if (!normalizedProductId) {
+      throw new Error('product_id is required');
+    }
+
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${TIMELINE_TAB}!A2:G`,
+    });
+
+    const rows = response.data.values || [];
+    const productRows = rows.filter((row: any[]) => String(row[0] || '').trim() === normalizedProductId);
+    const otherRows = rows.filter((row: any[]) => String(row[0] || '').trim() !== normalizedProductId);
+
+    const parsedRows = productRows
+      .map((row: any[]) => {
+        const month = String(row[1] || '').trim();
+        const monthIndex = this.parseYearMonthIndex(month);
+        if (monthIndex === null) return null;
+        return {
+          month,
+          monthIndex,
+          label: String(row[2] || '').trim(),
+          burnRate: parseFloat(String(row[3] || '0')) || 0,
+          isForecast: String(row[4] || '').toLowerCase() === 'true',
+          calculatedAt: String(row[5] || '').trim(),
+          eventCount: parseInt(String(row[6] || '0'), 10) || 0,
+        };
+      })
+      .filter(Boolean) as Array<{
+        month: string;
+        monthIndex: number;
+        label: string;
+        burnRate: number;
+        isForecast: boolean;
+        calculatedAt: string;
+        eventCount: number;
+      }>;
+
+    const byMonth = new Map<string, typeof parsedRows[number]>();
+    for (const row of parsedRows) {
+      const existing = byMonth.get(row.month);
+      if (!existing) {
+        byMonth.set(row.month, row);
+        continue;
+      }
+
+      const existingTs = new Date(existing.calculatedAt || 0).getTime();
+      const candidateTs = new Date(row.calculatedAt || 0).getTime();
+      if (candidateTs >= existingTs) {
+        byMonth.set(row.month, row);
+      }
+    }
+
+    const productEvents = (await this.getAllEvents()).filter(
+      (event) => String(event.product_id || '').trim() === normalizedProductId
+    );
+
+    const joinMonthIndex = await this.getJoinMonthIndex(normalizedProductId, productEvents);
+    const { minIndex, maxIndex } = this.getTimelineRetentionRange();
+
+    const targetMonthIndexes: number[] = [];
+    if (joinMonthIndex !== null && maxIndex >= 0) {
+      const startIndex = Math.max(joinMonthIndex, minIndex);
+      for (let idx = startIndex; idx <= maxIndex; idx += 1) {
+        targetMonthIndexes.push(idx);
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    const normalizedRows = targetMonthIndexes.map((monthIndex) => {
+      const month = this.toYearMonth(monthIndex);
+      const existing = byMonth.get(month);
+
+      if (existing) {
+        return [
+          normalizedProductId,
+          month,
+          existing.label || this.toMonthLabel(monthIndex),
+          String(existing.burnRate),
+          'false',
+          existing.calculatedAt || nowIso,
+          String(existing.eventCount || 0),
+        ];
+      }
+
+      const burnRate = this.calculateMonthlyBurnForIndex(productEvents, monthIndex);
+      const eventCount = this.calculateMonthlyEventCount(productEvents, monthIndex);
+      return [
+        normalizedProductId,
+        month,
+        this.toMonthLabel(monthIndex),
+        String(burnRate),
+        'false',
+        nowIso,
+        String(eventCount),
+      ];
+    });
+
+    const currentComparable = [...productRows]
+      .sort((a: any[], b: any[]) => String(a[1] || '').localeCompare(String(b[1] || '')));
+    const nextComparable = [...normalizedRows]
+      .sort((a: any[], b: any[]) => String(a[1] || '').localeCompare(String(b[1] || '')));
+
+    if (!this.rowsAreEqual(currentComparable, nextComparable)) {
+      await this.replaceTabRows(`${TIMELINE_TAB}!A2:G`, [...otherRows, ...normalizedRows]);
+    }
+
+    const existingUniqueRowsInRange = Array.from(byMonth.values()).filter(
+      (row) => targetMonthIndexes.includes(row.monthIndex)
+    ).length;
+
+    return {
+      product_id: normalizedProductId,
+      kept: normalizedRows.length,
+      removed: Math.max(0, productRows.length - normalizedRows.length),
+      added: Math.max(0, normalizedRows.length - existingUniqueRowsInRange),
+    };
+  }
+
   async getAllEvents(): Promise<CostEvent[]> {
     await this.ensureSheets();
     const response = await this.sheets.spreadsheets.values.get({
@@ -332,6 +713,8 @@ export class CostMgmtService {
         values: [this.eventToRow(event)],
       },
     });
+
+    await this.ensureCalculatedSummaryRow(event.product_id);
   }
 
   async updateEventStatus(eventId: string, status: CostEventStatus): Promise<boolean> {
@@ -424,6 +807,8 @@ export class CostMgmtService {
       },
     });
 
+    await this.ensureCalculatedSummaryRow(normalized.product_id);
+
     return normalized;
   }
 
@@ -453,7 +838,7 @@ export class CostMgmtService {
       throw new Error('product_id is required');
     }
 
-    const [eventsResp, fundsResp, summaryResp, timelineResp] = await Promise.all([
+    const [eventsResp, fundsResp, summaryResp, calculatedResp, timelineResp] = await Promise.all([
       this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: `${EVENTS_TAB}!A2:Q`,
@@ -468,6 +853,10 @@ export class CostMgmtService {
       }),
       this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
+        range: `${CALCULATED_TAB}!A2:M`,
+      }),
+      this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
         range: `${TIMELINE_TAB}!A2:G`,
       }),
     ]);
@@ -475,17 +864,20 @@ export class CostMgmtService {
     const eventsRows = eventsResp.data.values || [];
     const fundsRows = fundsResp.data.values || [];
     const summaryRows = summaryResp.data.values || [];
+    const calculatedRows = calculatedResp.data.values || [];
     const timelineRows = timelineResp.data.values || [];
 
     const retainedEvents = eventsRows.filter((row: any[]) => String(row[1] || '').trim() !== normalizedProductId);
     const retainedFunds = fundsRows.filter((row: any[]) => String(row[0] || '').trim() !== normalizedProductId);
     const retainedSummary = summaryRows.filter((row: any[]) => String(row[0] || '').trim() !== normalizedProductId);
+    const retainedCalculated = calculatedRows.filter((row: any[]) => String(row[0] || '').trim() !== normalizedProductId);
     const retainedTimeline = timelineRows.filter((row: any[]) => String(row[0] || '').trim() !== normalizedProductId);
 
     await Promise.all([
       this.replaceTabRows(`${EVENTS_TAB}!A2:Q`, retainedEvents),
       this.replaceTabRows(`${FUNDS_TAB}!A2:C`, retainedFunds),
       this.replaceTabRows(`${SUMMARY_TAB}!A2:M`, retainedSummary),
+      this.replaceTabRows(`${CALCULATED_TAB}!A2:M`, retainedCalculated),
       this.replaceTabRows(`${TIMELINE_TAB}!A2:G`, retainedTimeline),
     ]);
 
@@ -638,9 +1030,26 @@ export class CostMgmtService {
     const normalizedProductId = String(productId || '').trim();
     if (!normalizedProductId) return null;
 
+    await this.ensureCalculatedSummaryRow(normalizedProductId);
+
+    const calculatedResponse = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${CALCULATED_TAB}!A2:M`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
+    });
+
+    const calculatedRows = calculatedResponse.data.values || [];
+    const calculatedRow = calculatedRows.find((r: any[]) => r[0] === normalizedProductId);
+    if (calculatedRow) {
+      return this.rowToSummary(calculatedRow);
+    }
+
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
       range: `${SUMMARY_TAB}!A2:M`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
     });
 
     const rows = response.data.values || [];
@@ -653,9 +1062,25 @@ export class CostMgmtService {
   async getAllSummaries(): Promise<CostSummary[]> {
     await this.ensureSheets();
 
+    const calculatedResponse = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${CALCULATED_TAB}!A2:M`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
+    });
+
+    const calculatedRows = calculatedResponse.data.values || [];
+    if (calculatedRows.length > 0) {
+      return calculatedRows
+        .map((row: any[]) => this.rowToSummary(row))
+        .filter((summary: CostSummary) => !!summary.product_id);
+    }
+
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
       range: `${SUMMARY_TAB}!A2:M`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
     });
 
     const rows = response.data.values || [];
@@ -718,48 +1143,56 @@ export class CostMgmtService {
     const normalizedProductId = String(productId || '').trim();
     if (!normalizedProductId) return null;
 
+    await this.pruneTimelineCache(normalizedProductId);
+
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
       range: `${TIMELINE_TAB}!A2:G`,
     });
 
     const rows = response.data.values || [];
-    const productRows = rows.filter((row: any[]) => {
-      // Expect at least: product_id, month, label, burn_rate, is_forecast, calculated_at, event_count
-      if (!Array.isArray(row) || row.length < 6) return false;
-      const rowProductId = String(row[0] || '').trim();
-      const month = String(row[1] || '').trim();
-      const calculatedAt = String(row[5] || '').trim();
-      if (!rowProductId || !month || !calculatedAt) return false;
-      if (!/^\d{4}-\d{2}$/.test(month)) return false;
-      return rowProductId === normalizedProductId;
-    });
+    const productRows = rows
+      .filter((row: any[]) => Array.isArray(row) && row.length >= 6)
+      .filter((row: any[]) => String(row[0] || '').trim() === normalizedProductId)
+      .filter((row: any[]) => /^\d{4}-\d{2}$/.test(String(row[1] || '').trim()));
+
     if (productRows.length === 0) return null;
 
-    const latestCalculatedAt = productRows.reduce((latest: string, row: any[]) => {
-      const candidate = String(row[5] || '');
-      if (!latest) return candidate;
-      return new Date(candidate).getTime() > new Date(latest).getTime() ? candidate : latest;
-    }, '');
+    const byMonth = new Map<string, any[]>();
+    for (const row of productRows) {
+      const month = String(row[1] || '').trim();
+      const existing = byMonth.get(month);
+      if (!existing) {
+        byMonth.set(month, row);
+        continue;
+      }
 
-    if (!latestCalculatedAt) return null;
+      const existingTs = new Date(String(existing[5] || '')).getTime();
+      const candidateTs = new Date(String(row[5] || '')).getTime();
+      if (candidateTs >= existingTs) {
+        byMonth.set(month, row);
+      }
+    }
 
-    const latestRows = productRows.filter((row: any[]) => String(row[5] || '').trim() === latestCalculatedAt);
-    const timeline = latestRows
+    const dedupedRows = Array.from(byMonth.values())
+      .sort((a: any[], b: any[]) => String(a[1] || '').localeCompare(String(b[1] || '')))
+      .slice(-TIMELINE_MAX_POINTS);
+
+    const timeline = dedupedRows
       .map((row: any[]) => ({
         month: String(row[1] || ''),
         label: String(row[2] || ''),
         burn_rate: parseFloat(String(row[3] || '0')) || 0,
         is_forecast: String(row[4] || '').toLowerCase() === 'true',
       }))
-      .filter((item: TimelinePoint) => !!item.month)
-      .sort((a: TimelinePoint, b: TimelinePoint) => a.month.localeCompare(b.month));
+      .filter((item: TimelinePoint) => !!item.month);
 
-    const eventCount = parseInt(String(latestRows[0]?.[6] || '0'), 10) || 0;
+    const calculatedAt = String(dedupedRows[dedupedRows.length - 1]?.[5] || new Date().toISOString());
+    const eventCount = parseInt(String(dedupedRows[dedupedRows.length - 1]?.[6] || '0'), 10) || 0;
 
     return {
       product_id: normalizedProductId,
-      calculated_at: latestCalculatedAt,
+      calculated_at: calculatedAt,
       event_count: eventCount,
       timeline,
     };
@@ -777,8 +1210,13 @@ export class CostMgmtService {
     const timeline = Array.isArray(input.timeline) ? input.timeline : [];
     const eventCount = Number.isFinite(input.event_count) ? input.event_count : 0;
 
-    const freshRows = timeline
-      .filter((point) => /^\d{4}-\d{2}$/.test(String(point.month || '').trim()))
+    const timelineLimited = this.normalizeTimelinePoints(
+      timeline
+        .filter((point) => /^\d{4}-\d{2}$/.test(String(point.month || '').trim()))
+        .sort((a, b) => String(a.month || '').localeCompare(String(b.month || '')))
+    );
+
+    const freshRows = timelineLimited
       .map((point) => [
         normalizedProductId,
         String(point.month || '').trim(),
