@@ -703,18 +703,80 @@ export class CostMgmtService {
     return rows.map((row: any[]) => this.rowToEvent(row)).filter((event: CostEvent) => !!event.event_id);
   }
 
-  async appendEvent(event: CostEvent): Promise<void> {
+  /**
+   * Optimized: Append event + ensure calculated row in ONE batch operation
+   * This reduces 3+ separate Google Sheets API calls to 1-2
+   */
+  async appendEventOptimized(event: CostEvent): Promise<void> {
+    // Call ensureSheets ONCE at start
     await this.ensureSheets();
-    await this.sheets.spreadsheets.values.append({
+
+    const normalizedProductId = String(event.product_id || '').trim();
+    if (!normalizedProductId) return;
+
+    // Check if calculated row already exists for this product (single read, not part of loop)
+    const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${EVENTS_TAB}!A:Q`,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [this.eventToRow(event)],
-      },
+      range: `${CALCULATED_TAB}!A:A`,
     });
 
-    await this.ensureCalculatedSummaryRow(event.product_id);
+    const idColumn = response.data.values || [];
+    const existingRowIndex = idColumn.findIndex((row: any[]) => String(row[0] || '').trim() === normalizedProductId);
+    
+    // Prepare both rows for appending
+    const eventRow = this.eventToRow(event);
+    const appendRequests: any[] = [];
+
+    // Always append event to EVENTS tab
+    appendRequests.push({
+      range: `${EVENTS_TAB}!A:Q`,
+      values: [eventRow],
+    });
+
+    // Only append calculated row if it doesn't exist
+    if (existingRowIndex === -1) {
+      const rowNumber = idColumn.length + 1;
+      const formulaRow = this.calculatedSummaryFormulaRow(normalizedProductId, rowNumber);
+      appendRequests.push({
+        range: `${CALCULATED_TAB}!A:M`,
+        values: [formulaRow],
+      });
+    }
+
+    // Batch both appends into single request if we need both
+    if (appendRequests.length === 2) {
+      // Append to EVENTS
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: appendRequests[0].range,
+        valueInputOption: 'RAW',
+        requestBody: { values: appendRequests[0].values },
+      });
+
+      // Append to CALCULATED with USER_ENTERED for formulas
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: appendRequests[1].range,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: appendRequests[1].values },
+      });
+    } else {
+      // Just append event (calculated row already exists)
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: appendRequests[0].range,
+        valueInputOption: 'RAW',
+        requestBody: { values: appendRequests[0].values },
+      });
+    }
+  }
+
+  /**
+   * Legacy method - kept for backwards compatibility
+   * Use appendEventOptimized() for new code
+   */
+  async appendEvent(event: CostEvent): Promise<void> {
+    await this.appendEventOptimized(event);
   }
 
   async updateEventStatus(eventId: string, status: CostEventStatus): Promise<boolean> {

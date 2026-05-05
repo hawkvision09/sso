@@ -26,6 +26,7 @@ export const getSheets = () => {
 export const SHEET_NAMES = {
   USERS: 'Users',
   SESSIONS: 'Sessions',
+  AUTH_TOKENS: 'AuthTokens',
   SERVICES: 'Services',
   ENTITLEMENTS: 'Entitlements',
   OTPS: 'OTPs',
@@ -37,7 +38,8 @@ export const SHEET_NAMES = {
 
 const HEADERS = {
   [SHEET_NAMES.USERS]: ['user_id', 'email', 'role', 'created_at', 'status'],
-  [SHEET_NAMES.SESSIONS]: ['session_id', 'user_id', 'device_info', 'created_at', 'expires_at', 'last_active_at', 'ip_address'],
+  [SHEET_NAMES.SESSIONS]: ['session_id', 'user_id', 'device_info', 'created_at', 'expires_at', 'last_active_at', 'ip_address', 'last_login_at', 'device_id', 'device_type', 'os_name', 'os_version', 'browser_name', 'browser_version', 'user_agent', 'metadata_hash'],
+  [SHEET_NAMES.AUTH_TOKENS]: ['user_id', 'session_id', 'token_hash', 'status', 'issued_at', 'expires_at', 'device_id', 'ip_address', 'device_type', 'os_name', 'os_version', 'browser_name', 'browser_version', 'user_agent', 'metadata_hash', 'created_at', 'updated_at'],
   [SHEET_NAMES.SERVICES]: ['service_id', 'name', 'description', 'redirect_url', 'free_tier_enabled', 'image_url'],
   [SHEET_NAMES.ENTITLEMENTS]: ['entitlement_id', 'user_id', 'service_id', 'tier_level', 'valid_until'],
   [SHEET_NAMES.OTPS]: ['email', 'otp_code', 'expires_at', 'created_at'],

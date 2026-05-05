@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/session';
 import { getRows, updateRow, findRowIndexByColumn, SHEET_NAMES } from '@/lib/sheets';
 
 // Helper to check if user has admin role (handles both old and new token formats)
@@ -14,14 +14,8 @@ function hasAdminRole(roles: string[] | undefined, legacyRole?: string): boolean
 // GET /api/admin/users - Get all users (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin authentication
-    const token = request.cookies.get('sso_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const payload = verifyToken(token);
-    if (!payload || !hasAdminRole(payload.roles, (payload as any).role)) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user || !hasAdminRole(user.roles)) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
@@ -44,14 +38,8 @@ export async function GET(request: NextRequest) {
 // PATCH /api/admin/users - Add or remove role (admin only)
 export async function PATCH(request: NextRequest) {
   try {
-    // Verify admin authentication
-    const token = request.cookies.get('sso_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const payload = verifyToken(token);
-    if (!payload || !hasAdminRole(payload.roles, (payload as any).role)) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user || !hasAdminRole(user.roles)) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
@@ -70,7 +58,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Prevent admin from removing their own admin role
-    if (userId === payload.user_id && role === 'admin' && action === 'remove') {
+    if (userId === user.user_id && role === 'admin' && action === 'remove') {
       return NextResponse.json({ error: 'Cannot remove your own admin role' }, { status: 400 });
     }
 
@@ -82,14 +70,14 @@ export async function PATCH(request: NextRequest) {
 
     // Get current user data
     const users = await getRows(SHEET_NAMES.USERS);
-    const user = users.find(u => u.user_id === userId);
+    const targetUser = users.find(u => u.user_id === userId);
     
-    if (!user) {
+    if (!targetUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Parse current roles
-    let currentRoles = user.role ? user.role.split(',').map((r: string) => r.trim()) : ['user'];
+    let currentRoles = targetUser.role ? targetUser.role.split(',').map((r: string) => r.trim()) : ['user'];
     
     // Add or remove role
     if (action === 'add') {
@@ -106,11 +94,11 @@ export async function PATCH(request: NextRequest) {
 
     // Update the roles
     const updatedRow = [
-      user.user_id,
-      user.email,
+      targetUser.user_id,
+      targetUser.email,
       currentRoles.join(','), // Store as comma-separated string
-      user.created_at,
-      user.status,
+      targetUser.created_at,
+      targetUser.status,
     ];
 
     const rowNumber = rowIndex + 1; // Convert to 1-based for Sheets API
@@ -120,11 +108,11 @@ export async function PATCH(request: NextRequest) {
       success: true, 
       message: `Role ${action === 'add' ? 'added' : 'removed'} successfully`,
       user: {
-        user_id: user.user_id,
-        email: user.email,
+        user_id: targetUser.user_id,
+        email: targetUser.email,
         roles: currentRoles,
-        created_at: user.created_at,
-        status: user.status,
+        created_at: targetUser.created_at,
+        status: targetUser.status,
       }
     });
   } catch (error: any) {

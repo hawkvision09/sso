@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyOTP } from '@/lib/otp';
 import { getOrCreateUser, createSession, generateToken } from '@/lib/auth';
+import { resolveDeviceContext } from '@/lib/device';
+import { persistAuthTokenRecord } from '@/lib/authTokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,14 +28,10 @@ export async function POST(request: NextRequest) {
     // Get or create user
     const user = await getOrCreateUser(email);
     
-    // Get device info and IP
-    const userAgent = request.headers.get('user-agent') || 'Unknown';
-    const ip = request.headers.get('x-forwarded-for') || 
-               request.headers.get('x-real-ip') || 
-               'Unknown';
+    const device = resolveDeviceContext(request);
     
     // Create session (this will delete any existing sessions for this user)
-    const session = await createSession(user.user_id, userAgent, ip);
+    const session = await createSession(user.user_id, device.deviceInfo, device.ipAddress, device);
     
     // Debug logging
     console.log('User object:', JSON.stringify(user, null, 2));
@@ -45,6 +43,14 @@ export async function POST(request: NextRequest) {
       user_id: user.user_id,
       email: user.email,
       roles: user.roles, // Changed to roles array
+    });
+
+    await persistAuthTokenRecord({
+      userId: user.user_id,
+      sessionId: session.session_id,
+      token,
+      expiresAt: session.expires_at,
+      device,
     });
     
     // Set HTTP-only cookie

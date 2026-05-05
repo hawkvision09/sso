@@ -10,6 +10,9 @@ import {
   deleteRowsByColumn,
   findRowsByColumn
 } from '@/lib/sheets';
+import { initializeSheets } from '@/lib/sheets';
+import type { DeviceContext } from '@/lib/device';
+import { revokeAuthTokensBySessionId, revokeAuthTokensByUserId } from '@/lib/authTokens';
 
 export interface User {
   user_id: string;
@@ -27,6 +30,15 @@ export interface Session {
   expires_at: string;
   last_active_at: string;
   ip_address: string;
+  last_login_at: string;
+  device_id: string;
+  device_type: string;
+  os_name: string;
+  os_version: string;
+  browser_name: string;
+  browser_version: string;
+  user_agent: string;
+  metadata_hash: string;
 }
 
 export interface JWTPayload {
@@ -34,6 +46,62 @@ export interface JWTPayload {
   user_id: string;
   email: string;
   roles: string[]; // Changed from single role to array
+}
+
+let sessionSheetsChecked = false;
+
+async function ensureSessionSheetsReady(): Promise<void> {
+  if (sessionSheetsChecked) return;
+
+  try {
+    await findRowsByColumn(SHEET_NAMES.SESSIONS, 'session_id', '__probe__');
+  } catch {
+    await initializeSheets();
+  }
+
+  sessionSheetsChecked = true;
+}
+
+function mapSessionRow(session: Record<string, string>): Session {
+  return {
+    session_id: session.session_id || '',
+    user_id: session.user_id || '',
+    device_info: session.device_info || '',
+    created_at: session.created_at || '',
+    expires_at: session.expires_at || '',
+    last_active_at: session.last_active_at || '',
+    ip_address: session.ip_address || '',
+    last_login_at: session.last_login_at || session.created_at || '',
+    device_id: session.device_id || '',
+    device_type: session.device_type || 'unknown',
+    os_name: session.os_name || 'unknown',
+    os_version: session.os_version || '',
+    browser_name: session.browser_name || 'unknown',
+    browser_version: session.browser_version || '',
+    user_agent: session.user_agent || session.device_info || '',
+    metadata_hash: session.metadata_hash || '',
+  };
+}
+
+function sessionToRow(session: Session): any[] {
+  return [
+    session.session_id,
+    session.user_id,
+    session.device_info,
+    session.created_at,
+    session.expires_at,
+    session.last_active_at,
+    session.ip_address,
+    session.last_login_at,
+    session.device_id,
+    session.device_type,
+    session.os_name,
+    session.os_version,
+    session.browser_name,
+    session.browser_version,
+    session.user_agent,
+    session.metadata_hash,
+  ];
 }
 
 // Create or get user
@@ -74,12 +142,51 @@ export async function getOrCreateUser(email: string): Promise<User> {
 export async function createSession(
   userId: string, 
   deviceInfo: string, 
-  ipAddress: string
+  ipAddress: string,
+  deviceMetadata: Partial<DeviceContext> = {}
 ): Promise<Session> {
+  await ensureSessionSheetsReady();
+
+  const existingSessions = await getUserSessions(userId);
+  const matchingSession = deviceMetadata.deviceId
+    ? existingSessions.find(session => session.device_id === deviceMetadata.deviceId)
+    : null;
+
   const sessionId = uuidv4();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + APP_CONFIG.sessionDurationDays * 24 * 60 * 60 * 1000);
-  
+
+  if (matchingSession) {
+    const updatedSession: Session = {
+      ...matchingSession,
+      device_info: deviceInfo,
+      ip_address: ipAddress,
+      last_active_at: now.toISOString(),
+      last_login_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      device_id: deviceMetadata.deviceId || matchingSession.device_id,
+      device_type: deviceMetadata.deviceType || matchingSession.device_type,
+      os_name: deviceMetadata.osName || matchingSession.os_name,
+      os_version: deviceMetadata.osVersion || matchingSession.os_version,
+      browser_name: deviceMetadata.browserName || matchingSession.browser_name,
+      browser_version: deviceMetadata.browserVersion || matchingSession.browser_version,
+      user_agent: deviceMetadata.userAgent || matchingSession.user_agent,
+      metadata_hash: deviceMetadata.metadataHash || matchingSession.metadata_hash,
+    };
+
+    const rowIndex = await findRowIndexByColumn(SHEET_NAMES.SESSIONS, 'session_id', matchingSession.session_id);
+    if (rowIndex !== -1) {
+      await updateRow(SHEET_NAMES.SESSIONS, `A${rowIndex + 1}`, sessionToRow(updatedSession));
+    }
+
+    return updatedSession;
+  }
+
+  if (existingSessions.length > 0) {
+    await revokeAuthTokensByUserId(userId);
+    await deleteRowsByColumn(SHEET_NAMES.SESSIONS, 'user_id', userId);
+  }
+
   const session: Session = {
     session_id: sessionId,
     user_id: userId,
@@ -88,27 +195,25 @@ export async function createSession(
     expires_at: expiresAt.toISOString(),
     last_active_at: now.toISOString(),
     ip_address: ipAddress,
+    last_login_at: now.toISOString(),
+    device_id: deviceMetadata.deviceId || '',
+    device_type: deviceMetadata.deviceType || 'unknown',
+    os_name: deviceMetadata.osName || 'unknown',
+    os_version: deviceMetadata.osVersion || '',
+    browser_name: deviceMetadata.browserName || 'unknown',
+    browser_version: deviceMetadata.browserVersion || '',
+    user_agent: deviceMetadata.userAgent || deviceInfo,
+    metadata_hash: deviceMetadata.metadataHash || '',
   };
   
-  // KEY REQUIREMENT: Delete all existing sessions for this user
-  await deleteRowsByColumn(SHEET_NAMES.SESSIONS, 'user_id', userId);
-  
-  // Create new session
-  await appendRow(SHEET_NAMES.SESSIONS, [
-    session.session_id,
-    session.user_id,
-    session.device_info,
-    session.created_at,
-    session.expires_at,
-    session.last_active_at,
-    session.ip_address,
-  ]);
+  await appendRow(SHEET_NAMES.SESSIONS, sessionToRow(session));
   
   return session;
 }
 
 // Get session by ID
 export async function getSession(sessionId: string): Promise<Session | null> {
+  await ensureSessionSheetsReady();
   const session = await findRowByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
   
   if (!session) return null;
@@ -117,14 +222,16 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   if (new Date(session.expires_at) < new Date()) {
     // Delete expired session
     await deleteRowsByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
+    await revokeAuthTokensBySessionId(sessionId);
     return null;
   }
   
-  return session as Session;
+  return mapSessionRow(session);
 }
 
 // Update session activity
 export async function updateSessionActivity(sessionId: string): Promise<void> {
+  await ensureSessionSheetsReady();
   const rowIndex = await findRowIndexByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
   
   if (rowIndex === -1) return;
@@ -132,20 +239,12 @@ export async function updateSessionActivity(sessionId: string): Promise<void> {
   const session = await findRowByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
   if (!session) return;
   
-  const updatedSession = {
-    ...session,
+  const updatedSession: Session = {
+    ...mapSessionRow(session),
     last_active_at: new Date().toISOString(),
   };
   
-  await updateRow(SHEET_NAMES.SESSIONS, `A${rowIndex + 1}`, [
-    updatedSession.session_id,
-    updatedSession.user_id,
-    updatedSession.device_info,
-    updatedSession.created_at,
-    updatedSession.expires_at,
-    updatedSession.last_active_at,
-    updatedSession.ip_address,
-  ]);
+  await updateRow(SHEET_NAMES.SESSIONS, `A${rowIndex + 1}`, sessionToRow(updatedSession));
 }
 
 // Generate JWT token
@@ -180,13 +279,15 @@ export async function getUserById(userId: string): Promise<User | null> {
 // Logout - delete session
 export async function deleteSession(sessionId: string): Promise<void> {
   await deleteRowsByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
+  await revokeAuthTokensBySessionId(sessionId);
 }
 
 // Get all sessions for a user
 export async function getUserSessions(userId: string): Promise<Session[]> {
+  await ensureSessionSheetsReady();
   const sessions = await findRowsByColumn(SHEET_NAMES.SESSIONS, 'user_id', userId);
   
   // Filter out expired sessions
   const now = new Date();
-  return sessions.filter(s => new Date(s.expires_at) > now) as Session[];
+  return sessions.filter(s => new Date(s.expires_at) > now).map(session => mapSessionRow(session));
 }
