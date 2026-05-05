@@ -164,7 +164,7 @@ export async function persistAuthTokenRecord(params: {
   }
 
   if (existingTokenHash && existingTokenHash === record.token_hash) {
-    record.created_at = existing.created_at || record.created_at;
+    record.created_at = existing?.created_at || record.created_at;
   }
 
   await updateRow(SHEET_NAMES.AUTH_TOKENS, `A${rowIndex + 1}`, toRow(record));
