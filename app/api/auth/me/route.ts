@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, getSession, getUserById } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/session';
+
+function getTokenFromRequest(request: NextRequest): string | null {
+  const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim() || null;
+  }
+
+  return request.cookies.get('sso_token')?.value || null;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('sso_token')?.value;
+    const token = getTokenFromRequest(request);
     
     if (!token) {
       return NextResponse.json(
@@ -11,31 +20,12 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-    
-    // Verify JWT
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-    
-    // Verify session still exists
-    const session = await getSession(payload.session_id);
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Session expired' },
-        { status: 401 }
-      );
-    }
-    
-    // Get user
-    const user = await getUserById(payload.user_id);
+
+    const user = await getAuthenticatedUserFromRequest(request);
     if (!user) {
       return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
     

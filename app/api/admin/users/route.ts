@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/session';
 import { getRows, updateRow, findRowIndexByColumn, SHEET_NAMES } from '@/lib/sheets';
 
 // Helper to check if user has admin role (handles both old and new token formats)
@@ -14,14 +14,8 @@ function hasAdminRole(roles: string[] | undefined, legacyRole?: string): boolean
 // GET /api/admin/users - Get all users (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin authentication
-    const token = request.cookies.get('sso_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const payload = verifyToken(token);
-    if (!payload || !hasAdminRole(payload.roles, (payload as any).role)) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user || !hasAdminRole(user.roles)) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
@@ -44,14 +38,8 @@ export async function GET(request: NextRequest) {
 // PATCH /api/admin/users - Add or remove role (admin only)
 export async function PATCH(request: NextRequest) {
   try {
-    // Verify admin authentication
-    const token = request.cookies.get('sso_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const payload = verifyToken(token);
-    if (!payload || !hasAdminRole(payload.roles, (payload as any).role)) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user || !hasAdminRole(user.roles)) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
@@ -70,7 +58,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Prevent admin from removing their own admin role
-    if (userId === payload.user_id && role === 'admin' && action === 'remove') {
+    if (userId === user.user_id && role === 'admin' && action === 'remove') {
       return NextResponse.json({ error: 'Cannot remove your own admin role' }, { status: 400 });
     }
 
