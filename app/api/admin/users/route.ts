@@ -70,14 +70,14 @@ export async function PATCH(request: NextRequest) {
 
     // Get current user data
     const users = await getRows(SHEET_NAMES.USERS);
-    const user = users.find(u => u.user_id === userId);
+    const targetUser = users.find(u => u.user_id === userId);
     
-    if (!user) {
+    if (!targetUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Parse current roles
-    let currentRoles = user.role ? user.role.split(',').map((r: string) => r.trim()) : ['user'];
+    let currentRoles = targetUser.role ? targetUser.role.split(',').map((r: string) => r.trim()) : ['user'];
     
     // Add or remove role
     if (action === 'add') {
@@ -94,11 +94,11 @@ export async function PATCH(request: NextRequest) {
 
     // Update the roles
     const updatedRow = [
-      user.user_id,
-      user.email,
+      targetUser.user_id,
+      targetUser.email,
       currentRoles.join(','), // Store as comma-separated string
-      user.created_at,
-      user.status,
+      targetUser.created_at,
+      targetUser.status,
     ];
 
     const rowNumber = rowIndex + 1; // Convert to 1-based for Sheets API
@@ -108,11 +108,11 @@ export async function PATCH(request: NextRequest) {
       success: true, 
       message: `Role ${action === 'add' ? 'added' : 'removed'} successfully`,
       user: {
-        user_id: user.user_id,
-        email: user.email,
+        user_id: targetUser.user_id,
+        email: targetUser.email,
         roles: currentRoles,
-        created_at: user.created_at,
-        status: user.status,
+        created_at: targetUser.created_at,
+        status: targetUser.status,
       }
     });
   } catch (error: any) {
