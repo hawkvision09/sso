@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, deleteSession } from '@/lib/auth';
+import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
       if (payload?.session_id) {
         // Delete session row from Google Sheets
         await deleteSession(payload.session_id);
+          await revokeAuthTokensBySessionId(payload.session_id);
         console.log('[SSO LOGOUT] Deleted session from Sheets:', payload.session_id);
       }
     }

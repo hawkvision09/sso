@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthenticatedUserFromRequest } from '@/lib/session';
 import { getAllServices, createService, updateService } from '@/lib/services';
 
 // Get all services
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('sso_token')?.value;
-    
-    if (!token) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-    
-    // Handle both old (role) and new (roles) token formats
-    const roles = payload.roles || ((payload as any).role ? [(payload as any).role] : []);
-    console.log('Admin check - payload.roles:', payload.roles, 'extracted roles:', roles);
+    const roles = user.roles || [];
+    console.log('Admin check - roles:', roles);
     
     if (!roles.includes('admin')) {
       return NextResponse.json(
@@ -48,25 +38,15 @@ export async function GET(request: NextRequest) {
 // Create new service
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get('sso_token')?.value;
-    
-    if (!token) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-    
-    // Handle both old (role) and new (roles) token formats
-    const roles = payload.roles || ((payload as any).role ? [(payload as any).role] : []);
+    const roles = user.roles || [];
     if (!roles.includes('admin')) {
       return NextResponse.json(
         { error: 'Admin access required' },
@@ -107,25 +87,15 @@ export async function POST(request: NextRequest) {
 // Update existing service
 export async function PUT(request: NextRequest) {
   try {
-    const token = request.cookies.get('sso_token')?.value;
-    
-    if (!token) {
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-    
-    // Handle both old (role) and new (roles) token formats
-    const roles = payload.roles || ((payload as any).role ? [(payload as any).role] : []);
+    const roles = user.roles || [];
     if (!roles.includes('admin')) {
       return NextResponse.json(
         { error: 'Admin access required' },

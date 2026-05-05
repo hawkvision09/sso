@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
-import { getSession, getUserById, verifyToken, type User } from '@/lib/auth';
+import { getSession, getUserById, updateSessionActivity, verifyToken, type User } from '@/lib/auth';
+import { validateAuthTokenAgainstStore } from '@/lib/authTokens';
 import type { NextRequest } from 'next/server';
 
 export async function getAuthenticatedUser(): Promise<User | null> {
@@ -11,8 +12,18 @@ export async function getAuthenticatedUser(): Promise<User | null> {
   const payload = verifyToken(token);
   if (!payload) return null;
 
+  const tokenRecord = await validateAuthTokenAgainstStore({
+    userId: payload.user_id,
+    sessionId: payload.session_id,
+    token,
+  });
+
+  if (!tokenRecord) return null;
+
   const session = await getSession(payload.session_id);
   if (!session) return null;
+
+  await updateSessionActivity(payload.session_id);
 
   const user = await getUserById(payload.user_id);
   if (!user || user.status !== 'active') return null;
@@ -32,10 +43,20 @@ export async function getAuthenticatedUserFromRequest(request: NextRequest | Req
     const payload = verifyToken(bearer);
     if (!payload) return null;
 
+    const tokenRecord = await validateAuthTokenAgainstStore({
+      userId: payload.user_id,
+      sessionId: payload.session_id,
+      token: bearer,
+    });
+
+    if (!tokenRecord) return null;
+
     // App-issued access tokens may not include a session_id.
     if (payload.session_id) {
       const session = await getSession(payload.session_id);
       if (!session) return null;
+
+      await updateSessionActivity(payload.session_id);
     }
 
     const user = await getUserById(payload.user_id);

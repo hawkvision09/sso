@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { verifyToken } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/session";
 import { getServiceById } from "@/lib/services";
 import { createAuthCode } from "@/lib/authCodes";
 
@@ -77,9 +77,8 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
     redirect(`/login?return_url=${encodeURIComponent(returnUrl)}`);
   }
 
-  // Verify token
-  const payload = verifyToken(token);
-  if (!payload) {
+  const user = await getAuthenticatedUser();
+  if (!user) {
     // Invalid token - redirect to login
     const returnUrl = `/authorize?service_id=${service_id}&redirect_uri=${encodeURIComponent(effectiveRedirectUri)}${state ? `&state=${state}` : ""}`;
     redirect(`/login?return_url=${encodeURIComponent(returnUrl)}`);
@@ -103,7 +102,7 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
   }
 
   // Check if user has access to this service
-  const userRoles = payload.roles || [];
+  const userRoles = user.roles || [];
   const isAdmin = userRoles.includes("admin");
   const hasFreeAccess = service.free_tier_enabled === "true";
 
@@ -122,7 +121,7 @@ export default async function AuthorizePage({ searchParams }: PageProps) {
   }
 
   // Generate authorization code
-  const code = await createAuthCode(payload.user_id, service_id, effectiveRedirectUri);
+  const code = await createAuthCode(user.user_id, service_id, effectiveRedirectUri);
 
   // Build redirect URL with code and state
   const redirectUrl = new URL(effectiveRedirectUri);

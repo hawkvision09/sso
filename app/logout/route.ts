@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, deleteSession } from '@/lib/auth';
+import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
 
 /**
  * GET /logout
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
       const payload = verifyToken(token);
       if (payload?.session_id) {
         await deleteSession(payload.session_id);
+        await revokeAuthTokensBySessionId(payload.session_id);
         console.log('[SSO LOGOUT] Deleted session:', payload.session_id);
       }
     }

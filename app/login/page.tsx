@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function LoginForm() {
@@ -12,8 +12,41 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [deviceId, setDeviceId] = useState("");
+  const [publicIp, setPublicIp] = useState("");
 
   const serviceId = searchParams.get("service_id");
+
+  useEffect(() => {
+    const storageKey = "hawkvision_device_id";
+    const existing = window.localStorage.getItem(storageKey);
+    const nextId = existing || window.crypto.randomUUID();
+
+    if (!existing) {
+      window.localStorage.setItem(storageKey, nextId);
+    }
+
+    setDeviceId(nextId);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const resp = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
+        if (!resp.ok) return;
+        const j = await resp.json();
+        if (mounted && j && j.ip) setPublicIp(String(j.ip));
+      } catch (e) {
+        // best-effort; ignore errors
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +57,11 @@ function LoginForm() {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(deviceId ? { "X-Device-Id": deviceId } : {}),
+          ...(publicIp ? { "X-Client-Public-IP": publicIp } : {}),
+        },
         body: JSON.stringify({ email }),
       });
 
@@ -51,7 +88,11 @@ function LoginForm() {
     try {
       const response = await fetch("/api/auth/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(deviceId ? { "X-Device-Id": deviceId } : {}),
+          ...(publicIp ? { "X-Client-Public-IP": publicIp } : {}),
+        },
         body: JSON.stringify({ email, otp }),
       });
 

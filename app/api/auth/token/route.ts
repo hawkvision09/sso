@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAndConsumeAuthCode } from '@/lib/authCodes';
 import { getServiceById } from '@/lib/services';
-import { getUserById, generateToken } from '@/lib/auth';
+import { getUserById, generateToken, getUserSessions } from '@/lib/auth';
+import { APP_CONFIG } from '@/lib/config';
+import { persistAuthTokenRecord } from '@/lib/authTokens';
+import { resolveDeviceContext } from '@/lib/device';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,19 +46,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const device = resolveDeviceContext(request);
+    const sessions = await getUserSessions(user.user_id);
+    const session = sessions[0];
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'No active session found. Please login again.' },
+        { status: 401 }
+      );
+    }
+
     // Generate access token (JWT)
     const accessToken = generateToken({
-      session_id: '', // Not needed for SSO tokens
+      session_id: session.session_id,
       user_id: user.user_id,
       email: user.email,
       roles: user.roles,
     });
 
+    await persistAuthTokenRecord({
+      userId: user.user_id,
+      sessionId: session.session_id,
+      token: accessToken,
+      expiresAt: session.expires_at,
+      device,
+    });
+
+    // Calculate token expiration based on SESSION_DURATION_DAYS config
+    const tokenExpiresInSeconds = APP_CONFIG.sessionDurationDays * 24 * 60 * 60;
+    const tokenExpiresAt = new Date(Date.now() + tokenExpiresInSeconds * 1000).toISOString();
+
     // Return token and user info
     return NextResponse.json({
       access_token: accessToken,
       token_type: 'Bearer',
-      expires_in: 3600, // 1 hour
+      expires_in: tokenExpiresInSeconds, // In seconds
+      token_expires_at: tokenExpiresAt, // ISO string for storage
       user: {
         user_id: user.user_id,
         email: user.email,
