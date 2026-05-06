@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyOTP } from '@/lib/otp';
 import { getOrCreateUser, createSession, generateToken } from '@/lib/auth';
 import { resolveDeviceContext } from '@/lib/device';
-import { persistAuthTokenRecord } from '@/lib/authTokens';
+import { getReusableAuthToken, persistAuthTokenRecord } from '@/lib/authTokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,21 +37,26 @@ export async function POST(request: NextRequest) {
     console.log('User object:', JSON.stringify(user, null, 2));
     console.log('User roles:', user.roles);
     
-    // Generate JWT
-    const token = generateToken({
+    const reusableToken = await getReusableAuthToken({
+      userId: user.user_id,
+      sessionId: session.session_id,
+    });
+
+    const token = reusableToken || generateToken({
       session_id: session.session_id,
       user_id: user.user_id,
       email: user.email,
       roles: user.roles, // Changed to roles array
     });
 
-    await persistAuthTokenRecord({
-      userId: user.user_id,
-      sessionId: session.session_id,
-      token,
-      expiresAt: session.expires_at,
-      device,
-    });
+    if (!reusableToken) {
+      await persistAuthTokenRecord({
+        userId: user.user_id,
+        sessionId: session.session_id,
+        token,
+        expiresAt: session.expires_at,
+      });
+    }
     
     // Set HTTP-only cookie
     const response = NextResponse.json({
