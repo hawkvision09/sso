@@ -26,6 +26,7 @@ function LoginForm() {
       window.localStorage.setItem(storageKey, nextId);
     }
 
+    document.cookie = `hawkvision_device_id=${nextId}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
     setDeviceId(nextId);
   }, []);
 

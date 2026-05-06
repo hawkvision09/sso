@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, deleteSession } from '@/lib/auth';
-import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
+import { verifyToken, deleteSession, deleteSessionDevice } from '@/lib/auth';
 
 /**
  * GET /logout
@@ -15,6 +14,11 @@ import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const redirectUri = searchParams.get('redirect_uri') || '/login';
+  const deviceId = (
+    searchParams.get('device_id')?.trim() ||
+    request.cookies.get('hawkvision_device_id')?.value?.trim() ||
+    ''
+  );
 
   // Best-effort: delete session from Google Sheets
   try {
@@ -22,9 +26,13 @@ export async function GET(request: NextRequest) {
     if (token) {
       const payload = verifyToken(token);
       if (payload?.session_id) {
-        await deleteSession(payload.session_id);
-        await revokeAuthTokensBySessionId(payload.session_id);
-        console.log('[SSO LOGOUT] Deleted session:', payload.session_id);
+        if (deviceId) {
+          const deletedSession = await deleteSessionDevice(payload.session_id, deviceId);
+          console.log('[SSO LOGOUT] Removed device from session:', payload.session_id, deviceId, deletedSession ? 'session-deleted' : 'session-kept');
+        } else {
+          await deleteSession(payload.session_id);
+          console.log('[SSO LOGOUT] Deleted session:', payload.session_id);
+        }
       }
     }
   } catch (err) {

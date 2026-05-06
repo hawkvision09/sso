@@ -38,8 +38,8 @@ export const SHEET_NAMES = {
 
 const HEADERS = {
   [SHEET_NAMES.USERS]: ['user_id', 'email', 'role', 'created_at', 'status'],
-  [SHEET_NAMES.SESSIONS]: ['session_id', 'user_id', 'device_info', 'created_at', 'expires_at', 'last_active_at', 'ip_address', 'last_login_at', 'device_id', 'device_type', 'os_name', 'os_version', 'browser_name', 'browser_version', 'user_agent', 'metadata_hash'],
-  [SHEET_NAMES.AUTH_TOKENS]: ['user_id', 'session_id', 'token_hash', 'status', 'issued_at', 'expires_at', 'device_id', 'ip_address', 'device_type', 'os_name', 'os_version', 'browser_name', 'browser_version', 'user_agent', 'metadata_hash', 'created_at', 'updated_at'],
+  [SHEET_NAMES.SESSIONS]: ['session_id', 'user_id', 'created_at', 'expires_at', 'last_active_at', 'last_login_at', 'devices_json'],
+  [SHEET_NAMES.AUTH_TOKENS]: ['user_id', 'session_id', 'token_value', 'token_hash', 'status', 'issued_at', 'expires_at', 'created_at', 'updated_at'],
   [SHEET_NAMES.SERVICES]: ['service_id', 'name', 'description', 'redirect_url', 'free_tier_enabled', 'image_url'],
   [SHEET_NAMES.ENTITLEMENTS]: ['entitlement_id', 'user_id', 'service_id', 'tier_level', 'valid_until'],
   [SHEET_NAMES.OTPS]: ['email', 'otp_code', 'expires_at', 'created_at'],
@@ -48,6 +48,25 @@ const HEADERS = {
   [SHEET_NAMES.USER_STORAGE_APPS]: ['user_id', 'app_name', 'container_id', 'schema_version', 'created_at', 'updated_at'],
   [SHEET_NAMES.PROVIDER_CONFIG]: ['provider', 'enabled', 'client_id', 'client_secret', 'redirect_uri', 'scopes', 'root_folder', 'updated_at'],
 };
+
+function isMissingSheetError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('Unable to parse range');
+}
+
+async function withSheetRecovery<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isMissingSheetError(error)) {
+      throw error;
+    }
+
+    console.warn('Detected missing sheet. Reinitializing Google Sheets schema.');
+    await initializeSheets();
+    return operation();
+  }
+}
 
 export const initializeSheets = async () => {
   const sheets = getSheets();
@@ -119,78 +138,86 @@ export const initializeSheets = async () => {
 // Data Access Helpers
 
 export const appendRow = async (sheetName: string, row: any[]) => {
-  const sheets = getSheets();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [row],
-    },
+  await withSheetRecovery(async () => {
+    const sheets = getSheets();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: sheetName,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [row],
+      },
+    });
   });
 };
 
 export const getRows = async (sheetName: string) => {
-  const sheets = getSheets();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,
-  });
-  
-  const rows = response.data.values || [];
-  if (rows.length === 0) return [];
-  
-  const headers = rows[0];
-  const data = rows.slice(1);
-  
-  return data.map(row => {
-    const obj: any = {};
-    headers.forEach((header: string, index: number) => {
-      obj[header] = row[index] || '';
+  return withSheetRecovery(async () => {
+    const sheets = getSheets();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: sheetName,
     });
-    return obj;
+
+    const rows = response.data.values || [];
+    if (rows.length === 0) return [];
+
+    const headers = rows[0];
+    const data = rows.slice(1);
+
+    return data.map(row => {
+      const obj: any = {};
+      headers.forEach((header: string, index: number) => {
+        obj[header] = row[index] || '';
+      });
+      return obj;
+    });
   });
 };
 
 export const updateRow = async (sheetName: string, range: string, row: any[]) => {
-  const sheets = getSheets();
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheetName}!${range}`,
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [row]
-    }
+  await withSheetRecovery(async () => {
+    const sheets = getSheets();
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [row]
+      }
+    });
   });
 };
 
 export const deleteRow = async (sheetName: string, rowIndex: number) => {
-  const sheets = getSheets();
-  
-  // Get sheet ID
-  const { data } = await sheets.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_ID,
-  });
-  
-  const sheet = data.sheets?.find(s => s.properties?.title === sheetName);
-  if (!sheet || !sheet.properties?.sheetId) {
-    throw new Error(`Sheet ${sheetName} not found`);
-  }
-  
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SPREADSHEET_ID,
-    requestBody: {
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId: sheet.properties.sheetId,
-            dimension: 'ROWS',
-            startIndex: rowIndex,
-            endIndex: rowIndex + 1,
-          }
-        }
-      }]
+  await withSheetRecovery(async () => {
+    const sheets = getSheets();
+    
+    // Get sheet ID
+    const { data } = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID,
+    });
+    
+    const sheet = data.sheets?.find(s => s.properties?.title === sheetName);
+    if (!sheet || !sheet.properties?.sheetId) {
+      throw new Error(`Sheet ${sheetName} not found`);
     }
+    
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: {
+        requests: [{
+          deleteDimension: {
+            range: {
+              sheetId: sheet.properties.sheetId,
+              dimension: 'ROWS',
+              startIndex: rowIndex,
+              endIndex: rowIndex + 1,
+            }
+          }
+        }]
+      }
+    });
   });
 };
 
@@ -208,55 +235,59 @@ export const findRowsByColumn = async (sheetName: string, columnName: string, va
 
 // Find row index (0-based for data rows, but we return 1-based for Sheets API)
 export const findRowIndexByColumn = async (sheetName: string, columnName: string, value: string) => {
-  const sheets = getSheets();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,
-  });
+  return withSheetRecovery(async () => {
+    const sheets = getSheets();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: sheetName,
+    });
 
-  const rows = response.data.values || [];
-  if (rows.length === 0) return -1;
+    const rows = response.data.values || [];
+    if (rows.length === 0) return -1;
 
-  const headers = rows[0];
-  const colIndex = headers.indexOf(columnName);
-  
-  if (colIndex === -1) return -1;
+    const headers = rows[0];
+    const colIndex = headers.indexOf(columnName);
+    
+    if (colIndex === -1) return -1;
 
-  // Search through rows (start from index 1 to skip header)
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][colIndex] === value) {
-      return i; // Return 0-based index (header is at 0, first data row is at 1)
+    // Search through rows (start from index 1 to skip header)
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][colIndex] === value) {
+        return i; // Return 0-based index (header is at 0, first data row is at 1)
+      }
     }
-  }
-  return -1;
+    return -1;
+  });
 };
 
 // Delete rows by column value
 export const deleteRowsByColumn = async (sheetName: string, columnName: string, value: string) => {
-  const sheets = getSheets();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,
-  });
+  await withSheetRecovery(async () => {
+    const sheets = getSheets();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: sheetName,
+    });
 
-  const rows = response.data.values || [];
-  if (rows.length === 0) return;
+    const rows = response.data.values || [];
+    if (rows.length === 0) return;
 
-  const headers = rows[0];
-  const colIndex = headers.indexOf(columnName);
-  
-  if (colIndex === -1) return;
+    const headers = rows[0];
+    const colIndex = headers.indexOf(columnName);
+    
+    if (colIndex === -1) return;
 
-  // Find all matching row indices (in reverse order to delete from bottom to top)
-  const indicesToDelete: number[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][colIndex] === value) {
-      indicesToDelete.push(i);
+    // Find all matching row indices (in reverse order to delete from bottom to top)
+    const indicesToDelete: number[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][colIndex] === value) {
+        indicesToDelete.push(i);
+      }
     }
-  }
 
-  // Delete rows in reverse order
-  for (const rowIndex of indicesToDelete.reverse()) {
-    await deleteRow(sheetName, rowIndex);
-  }
+    // Delete rows in reverse order
+    for (const rowIndex of indicesToDelete.reverse()) {
+      await deleteRow(sheetName, rowIndex);
+    }
+  });
 };
