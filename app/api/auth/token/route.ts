@@ -3,7 +3,7 @@ import { validateAndConsumeAuthCode } from '@/lib/authCodes';
 import { getServiceById } from '@/lib/services';
 import { getUserById, generateToken, getUserSessions } from '@/lib/auth';
 import { APP_CONFIG } from '@/lib/config';
-import { persistAuthTokenRecord } from '@/lib/authTokens';
+import { getReusableAuthToken, persistAuthTokenRecord } from '@/lib/authTokens';
 import { resolveDeviceContext } from '@/lib/device';
 
 export async function POST(request: NextRequest) {
@@ -57,21 +57,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate access token (JWT)
-    const accessToken = generateToken({
+    const reusableToken = await getReusableAuthToken({
+      userId: user.user_id,
+      sessionId: session.session_id,
+    });
+
+    const accessToken = reusableToken || generateToken({
       session_id: session.session_id,
       user_id: user.user_id,
       email: user.email,
       roles: user.roles,
     });
 
-    await persistAuthTokenRecord({
-      userId: user.user_id,
-      sessionId: session.session_id,
-      token: accessToken,
-      expiresAt: session.expires_at,
-      device,
-    });
+    if (!reusableToken) {
+      await persistAuthTokenRecord({
+        userId: user.user_id,
+        sessionId: session.session_id,
+        token: accessToken,
+        expiresAt: session.expires_at,
+      });
+    }
 
     // Calculate token expiration based on SESSION_DURATION_DAYS config
     const tokenExpiresInSeconds = APP_CONFIG.sessionDurationDays * 24 * 60 * 60;

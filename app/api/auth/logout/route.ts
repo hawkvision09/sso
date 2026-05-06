@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, deleteSession } from '@/lib/auth';
-import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
+import { verifyToken, deleteSession, deleteSessionDevice } from '@/lib/auth';
+
+function resolveLogoutDeviceId(request: NextRequest): string {
+  return (
+    request.headers.get('x-device-id')?.trim() ||
+    request.cookies.get('hawkvision_device_id')?.value?.trim() ||
+    ''
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,10 +16,15 @@ export async function POST(request: NextRequest) {
     if (token) {
       const payload = verifyToken(token);
       if (payload?.session_id) {
-        // Delete session row from Google Sheets
-        await deleteSession(payload.session_id);
-          await revokeAuthTokensBySessionId(payload.session_id);
-        console.log('[SSO LOGOUT] Deleted session from Sheets:', payload.session_id);
+        const deviceId = resolveLogoutDeviceId(request);
+
+        if (deviceId) {
+          const deletedSession = await deleteSessionDevice(payload.session_id, deviceId);
+          console.log('[SSO LOGOUT] Removed device from session:', payload.session_id, deviceId, deletedSession ? 'session-deleted' : 'session-kept');
+        } else {
+          await deleteSession(payload.session_id);
+          console.log('[SSO LOGOUT] Deleted session from Sheets:', payload.session_id);
+        }
       }
     }
 
