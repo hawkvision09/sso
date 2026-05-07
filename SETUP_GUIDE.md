@@ -1,4 +1,4 @@
-# HawkVision SSO v2 - Setup Guide
+# Woxin v2 - Setup Guide
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ Before you begin, ensure you have:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Click "Select a project" → "New Project"
-3. Name it "HawkVision SSO" (or your preferred name)
+3. Name it "Woxin" (or your preferred name)
 4. Click "Create"
 
 #### Enable Google Sheets API
@@ -49,7 +49,7 @@ Before you begin, ensure you have:
 
 1. Go to [Google Sheets](https://sheets.google.com/)
 2. Create a new blank spreadsheet
-3. Name it "HawkVision SSO Database"
+3. Name it "Woxin Database"
 4. Copy the Spreadsheet ID from the URL:
    ```
    https://docs.google.com/spreadsheets/d/SPREADSHEET_ID_HERE/edit
@@ -63,18 +63,20 @@ Before you begin, ensure you have:
 4. Uncheck "Notify people"
 5. Click "Share"
 
-### 3. Gmail SMTP Setup
+### 3. Resend Setup
 
-#### Enable 2-Factor Authentication
+#### Create a Sending Configuration
 
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Enable "2-Step Verification" if not already enabled
+1. Create a [Resend](https://resend.com) account
+2. Generate an API key from the Resend dashboard
+3. Verify your sending domain in Resend
+4. Choose a sender address on that verified domain
 
 #### Generate App Password
 
 1. Go to [App Passwords](https://myaccount.google.com/apppasswords)
 2. Select "Mail" and "Other (Custom name)"
-3. Name it "HawkVision SSO"
+3. Name it "Woxin"
 4. Click "Generate"
 5. Copy the 16-character password (remove spaces)
 6. **Save this password securely!**
@@ -110,14 +112,13 @@ SERVICE_ACCOUNT_KEY="paste_private_key_here_with_quotes"
 JWT_SECRET=generate_a_random_secret_here
 
 # Email Configuration
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-gmail@gmail.com
-SMTP_PASS=your_16_char_app_password_here
+RESEND_API_KEY=re_your_api_key
+RESEND_FROM_EMAIL=login@yourdomain.com
+RESEND_FROM_NAME=Woxin
 
 # Application Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3001
-APP_NAME=HawkVision SSO
+APP_NAME=Woxin
 SESSION_DURATION_DAYS=30
 OTP_EXPIRY_MINUTES=10
 AUTH_CODE_EXPIRY_SECONDS=60
@@ -245,10 +246,10 @@ Follow the `INTEGRATION_GUIDE.md` to integrate a test application.
 
 **Solution**:
 
-1. Verify Gmail SMTP credentials are correct
-2. Check that you're using an App Password, not your regular password
-3. Ensure 2FA is enabled on your Google account
-4. Try sending a test email using the same credentials
+1. Verify `RESEND_API_KEY` is correct
+2. Verify `RESEND_FROM_EMAIL` uses a domain verified in Resend
+3. Confirm the domain is active in the Resend dashboard
+4. Try sending a test email with the same Resend configuration
 
 ### Issue: Private Key Error
 

@@ -116,7 +116,7 @@
 │  │ 1. Generate 6-digit OTP                              │   │
 │  │ 2. Delete any existing OTPs for this email           │   │
 │  │ 3. Save OTP to Google Sheets (10min expiry)          │   │
-│  │ 4. Send OTP via Gmail SMTP                           │   │
+│  │ 4. Send OTP via Resend                               │   │
 │  │ 5. Return success                                    │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -308,7 +308,7 @@ User A logs in from Device 2
                                 │              │  AuthCodes   │
                                 ▼              └──────────────┘
                          ┌──────────────┐
-                         │  Gmail SMTP  │
+                         │    Resend    │
                          │              │
                          │  Send OTP    │
                          └──────────────┘

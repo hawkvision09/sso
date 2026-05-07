@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const redirectUri = searchParams.get('redirect_uri') || '/login';
   const deviceId = (
     searchParams.get('device_id')?.trim() ||
-    request.cookies.get('hawkvision_device_id')?.value?.trim() ||
+    request.cookies.get('Woxin_device_id')?.value?.trim() ||
     ''
   );
 

@@ -1,6 +1,6 @@
 # 📚 SSO v2 - Documentation Index
 
-Welcome to the HawkVision SSO v2 documentation! This index will help you find the information you need quickly.
+Welcome to the Woxin v2 documentation! This index will help you find the information you need quickly.
 
 ## 🚀 Quick Start
 
@@ -46,7 +46,7 @@ Welcome to the HawkVision SSO v2 documentation! This index will help you find th
 - Google Cloud Project setup
 - Service Account creation
 - Google Sheets configuration
-- Gmail SMTP setup
+- Resend setup
 - Environment variables
 - Database initialization
 - Creating admin user
@@ -246,7 +246,7 @@ Welcome to the HawkVision SSO v2 documentation! This index will help you find th
 - ✅ Screenshots references
 - ✅ Troubleshooting section
 - ✅ Google Cloud setup
-- ✅ Gmail SMTP setup
+- ✅ Resend setup
 
 ### INTEGRATION_GUIDE.md
 

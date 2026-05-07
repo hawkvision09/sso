@@ -34,15 +34,14 @@ export const SERVICE_ACCOUNT_KEY = processedKey;
 
 export const JWT_SECRET = process.env.JWT_SECRET || '';
 
-export const SMTP_CONFIG = {
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  user: process.env.SMTP_USER || '',
-  pass: process.env.SMTP_PASS || '',
+export const RESEND_CONFIG = {
+  apiKey: process.env.RESEND_API_KEY || '',
+  fromEmail: process.env.RESEND_FROM_EMAIL || '',
+  fromName: process.env.RESEND_FROM_NAME || process.env.APP_NAME || 'Woxin',
 };
 
 export const APP_CONFIG = {
-  name: process.env.APP_NAME || 'HawkVision SSO',
+  name: process.env.APP_NAME || 'Woxin',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   sessionDurationDays: parseInt(process.env.SESSION_DURATION_DAYS || '30'),
   otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10'),
@@ -56,6 +55,8 @@ export function validateConfig() {
     SERVICE_ACCOUNT_EMAIL,
     SERVICE_ACCOUNT_KEY,
     JWT_SECRET,
+    RESEND_API_KEY: RESEND_CONFIG.apiKey,
+    RESEND_FROM_EMAIL: RESEND_CONFIG.fromEmail,
   };
 
   const missing = Object.entries(required)

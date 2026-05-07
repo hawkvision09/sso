@@ -1,4 +1,4 @@
-# 🎉 HawkVision SSO v2 - Complete!
+# 🎉 Woxin v2 - Complete!
 
 ## ✅ Project Successfully Created!
 
@@ -23,7 +23,7 @@ npm install
 
 - Copy `.env.local.example` to `.env.local`
 - Fill in your Google Sheets credentials
-- Add Gmail SMTP credentials
+- Add Resend email credentials
 - Generate a JWT secret
 
 ### 3. Start Development Server
@@ -96,7 +96,7 @@ When a new session is created, all previous sessions for that user are automatic
 - **Styling**: CSS Modules (Premium design)
 - **Database**: Google Sheets
 - **Auth**: JWT + Custom logic
-- **Email**: Gmail SMTP
+- **Email**: Resend
 
 ## 📁 Project Structure
 

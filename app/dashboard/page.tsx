@@ -197,7 +197,7 @@ export default function DashboardPage() {
   return (
     <PageLayout>
       <Header
-        title="HawkVision SSO"
+        title="Woxin"
         user={user || undefined}
         showUserInfo={true}
         onLogout={handleLogout}

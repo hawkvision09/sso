@@ -4,7 +4,7 @@ import { verifyToken, deleteSession, deleteSessionDevice } from '@/lib/auth';
 function resolveLogoutDeviceId(request: NextRequest): string {
   return (
     request.headers.get('x-device-id')?.trim() ||
-    request.cookies.get('hawkvision_device_id')?.value?.trim() ||
+    request.cookies.get('Woxin_device_id')?.value?.trim() ||
     ''
   );
 }
