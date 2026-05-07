@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HawkVision SSO - Secure Single Sign-On",
+  title: "Woxin - Secure Single Sign-On",
   description:
     "Centralized authentication system for all your applications. Passwordless, secure, and easy to integrate.",
   keywords: [

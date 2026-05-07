@@ -207,7 +207,7 @@ AuthCodes (60s expiry, single-use)
 2. **Configure Environment**
    - Copy `.env.local.example` to `.env.local`
    - Fill in your Google Sheets credentials
-   - Add Gmail SMTP credentials
+   - Add Resend email credentials
    - Generate a JWT secret
 
 3. **Start Development Server**
@@ -232,7 +232,7 @@ See `SETUP_GUIDE.md` for complete step-by-step instructions including:
 - Google Cloud Project setup
 - Service Account creation
 - Google Sheets configuration
-- Gmail SMTP setup
+- Resend setup
 - Environment variable configuration
 
 ## 🔗 Integration Example
@@ -284,11 +284,11 @@ See `INTEGRATION_GUIDE.md` for complete integration instructions.
 - **Styling**: CSS Modules (Custom, no Tailwind)
 - **Database**: Google Sheets via googleapis
 - **Authentication**: jsonwebtoken + Custom Logic
-- **Email**: nodemailer (Gmail SMTP)
+- **Email**: Resend
 - **Dependencies**:
   - googleapis
   - jsonwebtoken
-  - nodemailer
+  - resend
   - uuid
 
 ## 📝 File Structure
