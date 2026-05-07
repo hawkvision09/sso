@@ -56,10 +56,10 @@ async function createFolder(drive: ReturnType<typeof google.drive>, name: string
 }
 
 function getSpreadsheetNamePrefix(): string {
-  const raw = (process.env.STORAGE_APP_SHEET_PREFIX || 'woxin').trim().toLowerCase();
+  const raw = (process.env.STORAGE_APP_SHEET_PREFIX || 'Woxin').trim().toLowerCase();
   // Keep only safe characters for predictable file naming.
   const sanitized = raw.replace(/[^a-z0-9_-]/g, '');
-  return sanitized || 'woxin';
+  return sanitized || 'Woxin';
 }
 
 export const googleDriveProvider: StorageProvider = {

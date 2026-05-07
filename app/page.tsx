@@ -23,7 +23,7 @@ export default function HomePage() {
 
           {/* Title */}
           <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight bg-gradient-to-r from-purple-400 via-purple-600 to-pink-400 bg-clip-text text-transparent">
-            HawkVision SSO
+            Woxin
           </h1>
 
           {/* Subtitle */}
@@ -193,7 +193,7 @@ export default function HomePage() {
         {/* Footer */}
         <footer className="py-10 px-5 text-center border-t border-white/10">
           <p className="text-white/50">
-            © 2026 HawkVision SSO. Built with Next.js and Google Sheets.
+            © 2026 Woxin. Built with Next.js and Google Sheets.
           </p>
         </footer>
       </div>

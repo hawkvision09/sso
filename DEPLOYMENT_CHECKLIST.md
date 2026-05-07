@@ -19,7 +19,7 @@
 - [ ] `SERVICE_ACCOUNT_EMAIL` is correct
 - [ ] `SERVICE_ACCOUNT_KEY` is properly formatted (with `\n`)
 - [ ] `JWT_SECRET` is strong and random (32+ characters)
-- [ ] `SMTP_USER` and `SMTP_PASS` are correct
+- [ ] `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are correct
 - [ ] `NEXT_PUBLIC_APP_URL` is set to production domain
 - [ ] All optional config values reviewed
 
@@ -34,9 +34,9 @@
 
 ### ✅ Email Setup
 
-- [ ] Gmail account configured
-- [ ] 2-Factor Authentication enabled
-- [ ] App Password generated
+- [ ] Resend account configured
+- [ ] Sending domain verified in Resend
+- [ ] API key created
 - [ ] Test email sent successfully
 - [ ] OTP emails received and formatted correctly
 
@@ -63,10 +63,9 @@
   - [ ] SERVICE_ACCOUNT_EMAIL
   - [ ] SERVICE_ACCOUNT_KEY
   - [ ] JWT_SECRET
-  - [ ] SMTP_HOST
-  - [ ] SMTP_PORT
-  - [ ] SMTP_USER
-  - [ ] SMTP_PASS
+  - [ ] RESEND_API_KEY
+  - [ ] RESEND_FROM_EMAIL
+  - [ ] RESEND_FROM_NAME
   - [ ] NEXT_PUBLIC_APP_URL (production URL)
   - [ ] APP_NAME
   - [ ] SESSION_DURATION_DAYS
@@ -341,7 +340,7 @@
 
 1. Check Vercel/hosting status
 2. Check Google Sheets API status
-3. Check Gmail SMTP status
+3. Check Resend status
 4. Review error logs
 5. Notify users if extended outage
 6. Implement fallback if available

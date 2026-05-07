@@ -3,6 +3,10 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -14,11 +18,12 @@ function LoginForm() {
   const [success, setSuccess] = useState("");
   const [deviceId, setDeviceId] = useState("");
   const [publicIp, setPublicIp] = useState("");
+  const [resendCountdown, setResendCountdown] = useState(0);
 
   const serviceId = searchParams.get("service_id");
 
   useEffect(() => {
-    const storageKey = "hawkvision_device_id";
+    const storageKey = "Woxin_device_id";
     const existing = window.localStorage.getItem(storageKey);
     const nextId = existing || window.crypto.randomUUID();
 
@@ -26,7 +31,7 @@ function LoginForm() {
       window.localStorage.setItem(storageKey, nextId);
     }
 
-    document.cookie = `hawkvision_device_id=${nextId}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+    document.cookie = `Woxin_device_id=${nextId}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
     setDeviceId(nextId);
   }, []);
 
@@ -39,7 +44,7 @@ function LoginForm() {
         if (!resp.ok) return;
         const j = await resp.json();
         if (mounted && j && j.ip) setPublicIp(String(j.ip));
-      } catch (e) {
+      } catch {
         // best-effort; ignore errors
       }
     })();
@@ -49,6 +54,38 @@ function LoginForm() {
     };
   }, []);
 
+  useEffect(() => {
+    if (resendCountdown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setResendCountdown((current) => Math.max(current - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [resendCountdown]);
+
+  const requestOTP = async () => {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(deviceId ? { "X-Device-Id": deviceId } : {}),
+        ...(publicIp ? { "X-Client-Public-IP": publicIp } : {}),
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to send OTP");
+    }
+
+    return data;
+  };
+
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -56,26 +93,33 @@ function LoginForm() {
     setSuccess("");
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(deviceId ? { "X-Device-Id": deviceId } : {}),
-          ...(publicIp ? { "X-Client-Public-IP": publicIp } : {}),
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send OTP");
-      }
-
+      await requestOTP();
       setSuccess("OTP sent! Check your email.");
       setStep("otp");
-    } catch (err: any) {
-      setError(err.message);
+      setResendCountdown(30);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (!email || resendCountdown > 0) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      await requestOTP();
+      setOtp("");
+      setSuccess("A new OTP has been sent to your email.");
+      setResendCountdown(30);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -112,8 +156,8 @@ function LoginForm() {
         // No return URL - direct login to SSO dashboard
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -136,7 +180,7 @@ function LoginForm() {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
               <div className="text-5xl">🔐</div>
-              <h1 className="text-3xl font-bold text-white">HawkVision SSO</h1>
+              <h1 className="text-3xl font-bold text-white">Woxin</h1>
             </div>
             <p className="text-white/70">Secure Single Sign-On</p>
           </div>
@@ -193,7 +237,7 @@ function LoginForm() {
 
               {serviceId && (
                 <div className="p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-200 text-sm text-center">
-                  You'll be redirected to your application after login
+                  You&apos;ll be redirected to your application after login
                 </div>
               )}
             </form>
@@ -247,12 +291,32 @@ function LoginForm() {
                 )}
               </button>
 
+              {success && (
+                <div className="p-4 bg-green-500/20 border border-green-500/30 rounded-lg text-green-200 text-sm">
+                  {success}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={loading || resendCountdown > 0}
+                className="w-full py-3 px-6 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading
+                  ? "Please wait..."
+                  : resendCountdown > 0
+                    ? `Resend code in ${resendCountdown}s`
+                    : "Resend code"}
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setStep("email");
                   setOtp("");
                   setError("");
+                  setSuccess("");
                 }}
                 disabled={loading}
                 className="w-full py-3 px-6 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -265,7 +329,7 @@ function LoginForm() {
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-white/50 text-sm">
-              Secure authentication powered by HawkVision
+              Secure authentication powered by Woxin
             </p>
           </div>
         </div>

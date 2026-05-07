@@ -1,6 +1,6 @@
 # Client Application Integration Guide
 
-This guide shows you how to integrate your application with HawkVision SSO.
+This guide shows you how to integrate your application with Woxin.
 
 ## Quick Start
 

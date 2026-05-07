@@ -1,4 +1,4 @@
-# HawkVision SSO v2 - Complete Implementation
+# Woxin v2 - Complete Implementation
 
 ## Overview
 
@@ -306,15 +306,14 @@ SERVICE_ACCOUNT_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
 # JWT
 JWT_SECRET=your-super-secret-jwt-key
 
-# Email (Gmail SMTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-specific-password
+# Email (Resend)
+RESEND_API_KEY=re_your_api_key
+RESEND_FROM_EMAIL=login@yourdomain.com
+RESEND_FROM_NAME=Woxin
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3001
-APP_NAME=HawkVision SSO
+APP_NAME=Woxin
 SESSION_DURATION_DAYS=30
 OTP_EXPIRY_MINUTES=10
 AUTH_CODE_EXPIRY_SECONDS=60
@@ -330,11 +329,12 @@ AUTH_CODE_EXPIRY_SECONDS=60
 6. Share your spreadsheet with the service account email
 7. Copy the spreadsheet ID from the URL
 
-### Gmail SMTP Setup
+### Resend Setup
 
-1. Enable 2-Factor Authentication on your Google Account
-2. Generate an App Password
-3. Use the app password in `SMTP_PASS`
+1. Create a Resend account
+2. Generate an API key
+3. Verify your sending domain in Resend
+4. Set `RESEND_FROM_EMAIL` to an address on that verified domain
 
 ## Installation
 
@@ -369,7 +369,7 @@ npm start
 - **Styling**: CSS Modules (Premium Design)
 - **Database**: Google Sheets via googleapis
 - **Auth**: jsonwebtoken + Custom Logic
-- **Email**: nodemailer (Gmail SMTP)
+- **Email**: Resend
 
 ## Security Best Practices
 
