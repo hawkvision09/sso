@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, APP_CONFIG } from '@/lib/config';
+import { JWT_SECRET, APP_CONFIG, AUTH_CORE_BACKEND, CORE_AUTH_DB_NAME } from '@/lib/config';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   SHEET_NAMES, 
@@ -13,6 +13,7 @@ import {
 import { initializeSheets } from '@/lib/sheets';
 import type { DeviceContext } from '@/lib/device';
 import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
+import { getMongoDb } from '@/lib/db/mongo';
 
 export interface User {
   user_id: string;
@@ -52,6 +53,52 @@ export interface JWTPayload {
 }
 
 let sessionSheetsChecked = false;
+let mongoIndexesReady = false;
+
+async function getCoreAuthCollections() {
+  const db = await getMongoDb(CORE_AUTH_DB_NAME);
+  const users = db.collection<User>('users');
+  const sessions = db.collection<Session>('sessions');
+
+  if (!mongoIndexesReady) {
+    await Promise.all([
+      users.createIndex({ email: 1 }, { unique: true }),
+      users.createIndex({ user_id: 1 }, { unique: true }),
+      sessions.createIndex({ session_id: 1 }, { unique: true }),
+      sessions.createIndex({ user_id: 1 }, { unique: true }),
+      sessions.createIndex({ expires_at: 1 }),
+    ]);
+    mongoIndexesReady = true;
+  }
+
+  return { users, sessions };
+}
+
+function mapMongoUser(doc: any): User {
+  const roles = Array.isArray(doc?.roles)
+    ? doc.roles
+    : (typeof doc?.role === 'string' ? doc.role.split(',').map((r: string) => r.trim()) : ['user']);
+
+  return {
+    user_id: doc?.user_id || '',
+    email: doc?.email || '',
+    roles,
+    created_at: doc?.created_at || '',
+    status: (doc?.status || 'active') as 'active' | 'suspended',
+  };
+}
+
+function mapMongoSession(doc: any): Session {
+  return {
+    session_id: doc?.session_id || '',
+    user_id: doc?.user_id || '',
+    created_at: doc?.created_at || '',
+    expires_at: doc?.expires_at || '',
+    last_active_at: doc?.last_active_at || '',
+    last_login_at: doc?.last_login_at || doc?.created_at || '',
+    devices_json: doc?.devices_json || '[]',
+  };
+}
 
 async function ensureSessionSheetsReady(): Promise<void> {
   if (sessionSheetsChecked) return;
@@ -184,6 +231,26 @@ function getUpdatedDevicesJson(
 
 // Create or get user
 export async function getOrCreateUser(email: string): Promise<User> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { users } = await getCoreAuthCollections();
+    const existingUser = await users.findOne({ email });
+
+    if (existingUser) {
+      return mapMongoUser(existingUser);
+    }
+
+    const newUser: User = {
+      user_id: uuidv4(),
+      email,
+      roles: ['user'],
+      created_at: new Date().toISOString(),
+      status: 'active',
+    };
+
+    await users.insertOne(newUser as any);
+    return newUser;
+  }
+
   // Check if user exists
   let user = await findRowByColumn(SHEET_NAMES.USERS, 'email', email);
   
@@ -223,6 +290,56 @@ export async function createSession(
   ipAddress: string,
   deviceMetadata: Partial<DeviceContext> = {}
 ): Promise<Session> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { sessions } = await getCoreAuthCollections();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + APP_CONFIG.sessionDurationDays * 24 * 60 * 60 * 1000);
+    const nowIso = now.toISOString();
+
+    const existingSessionDoc = await sessions.findOne({ user_id: userId });
+    const existingSession = existingSessionDoc ? mapMongoSession(existingSessionDoc) : null;
+
+    if (existingSession) {
+      if (new Date(existingSession.expires_at) < new Date()) {
+        await sessions.deleteOne({ session_id: existingSession.session_id });
+        await revokeAuthTokensBySessionId(existingSession.session_id);
+      } else {
+        const updatedSession: Session = {
+          ...existingSession,
+          last_active_at: nowIso,
+          last_login_at: nowIso,
+          expires_at: expiresAt.toISOString(),
+          devices_json: getUpdatedDevicesJson(existingSession.devices_json, deviceMetadata, nowIso),
+        };
+
+        await sessions.updateOne(
+          { session_id: updatedSession.session_id },
+          { $set: updatedSession as any }
+        );
+
+        return updatedSession;
+      }
+    }
+
+    const session: Session = {
+      session_id: uuidv4(),
+      user_id: userId,
+      created_at: nowIso,
+      expires_at: expiresAt.toISOString(),
+      last_active_at: nowIso,
+      last_login_at: nowIso,
+      devices_json: getUpdatedDevicesJson('[]', deviceMetadata, nowIso),
+    };
+
+    await sessions.replaceOne(
+      { user_id: userId },
+      session as any,
+      { upsert: true }
+    );
+
+    return session;
+  }
+
   await ensureSessionSheetsReady();
 
   const existingSessions = await getUserSessions(userId);
@@ -265,6 +382,21 @@ export async function createSession(
 
 // Get session by ID
 export async function getSession(sessionId: string): Promise<Session | null> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { sessions } = await getCoreAuthCollections();
+    const sessionDoc = await sessions.findOne({ session_id: sessionId });
+    if (!sessionDoc) return null;
+
+    const session = mapMongoSession(sessionDoc);
+    if (new Date(session.expires_at) < new Date()) {
+      await sessions.deleteOne({ session_id: sessionId });
+      await revokeAuthTokensBySessionId(sessionId);
+      return null;
+    }
+
+    return session;
+  }
+
   await ensureSessionSheetsReady();
   const session = await findRowByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
   
@@ -283,6 +415,15 @@ export async function getSession(sessionId: string): Promise<Session | null> {
 
 // Update session activity
 export async function updateSessionActivity(sessionId: string): Promise<void> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { sessions } = await getCoreAuthCollections();
+    await sessions.updateOne(
+      { session_id: sessionId },
+      { $set: { last_active_at: new Date().toISOString() } }
+    );
+    return;
+  }
+
   await ensureSessionSheetsReady();
   const rowIndex = await findRowIndexByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
   
@@ -317,6 +458,12 @@ export function verifyToken(token: string): JWTPayload | null {
 
 // Get user by ID
 export async function getUserById(userId: string): Promise<User | null> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { users } = await getCoreAuthCollections();
+    const userDoc = await users.findOne({ user_id: userId });
+    return userDoc ? mapMongoUser(userDoc) : null;
+  }
+
   const user = await findRowByColumn(SHEET_NAMES.USERS, 'user_id', userId);
   if (!user) return null;
   
@@ -330,11 +477,49 @@ export async function getUserById(userId: string): Promise<User | null> {
 
 // Logout - delete session
 export async function deleteSession(sessionId: string): Promise<void> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { sessions } = await getCoreAuthCollections();
+    await sessions.deleteOne({ session_id: sessionId });
+    await revokeAuthTokensBySessionId(sessionId);
+    return;
+  }
+
   await deleteRowsByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
   await revokeAuthTokensBySessionId(sessionId);
 }
 
 export async function deleteSessionDevice(sessionId: string, deviceId: string): Promise<boolean> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { sessions } = await getCoreAuthCollections();
+    const sessionDoc = await sessions.findOne({ session_id: sessionId });
+
+    if (!sessionDoc) {
+      await revokeAuthTokensBySessionId(sessionId);
+      return true;
+    }
+
+    const session = mapMongoSession(sessionDoc);
+    const remainingDevices = removeActiveDevice(parseDevicesJson(session.devices_json), deviceId);
+
+    if (remainingDevices.length === 0) {
+      await sessions.deleteOne({ session_id: sessionId });
+      await revokeAuthTokensBySessionId(sessionId);
+      return true;
+    }
+
+    await sessions.updateOne(
+      { session_id: sessionId },
+      {
+        $set: {
+          devices_json: serializeDevices(remainingDevices),
+          last_active_at: new Date().toISOString(),
+        },
+      }
+    );
+
+    return false;
+  }
+
   await ensureSessionSheetsReady();
 
   const rowIndex = await findRowIndexByColumn(SHEET_NAMES.SESSIONS, 'session_id', sessionId);
@@ -370,6 +555,22 @@ export async function deleteSessionDevice(sessionId: string, deviceId: string): 
 
 // Get all sessions for a user
 export async function getUserSessions(userId: string): Promise<Session[]> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { sessions } = await getCoreAuthCollections();
+    const sessionDocs = await sessions.find({ user_id: userId }).toArray();
+
+    const now = new Date();
+    const validSessions = sessionDocs
+      .map((sessionDoc) => mapMongoSession(sessionDoc))
+      .filter((session) => new Date(session.expires_at) > now);
+
+    if (validSessions.length === 0 && sessionDocs.length > 0) {
+      await sessions.deleteMany({ user_id: userId });
+    }
+
+    return validSessions;
+  }
+
   await ensureSessionSheetsReady();
   const sessions = await findRowsByColumn(SHEET_NAMES.SESSIONS, 'user_id', userId);
   

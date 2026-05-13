@@ -1,15 +1,14 @@
 import {
   appendRow,
-  getSheets,
   deleteRowsByColumn,
   findRowByColumn,
   findRowsByColumn,
   findRowIndexByColumn,
+  getRows,
   initializeSheets,
   SHEET_NAMES,
   updateRow,
 } from '@/lib/sheets';
-import { SPREADSHEET_ID } from '@/lib/config';
 import { google } from 'googleapis';
 import { decryptText, encryptText } from '@/lib/storage/crypto';
 import { getGoogleProviderConfig } from '@/lib/storage/providerConfig';
@@ -132,23 +131,9 @@ const appEnsureLocks = new Map<string, Promise<UserStorageAppMapRecord>>();
 async function findAppMappingRowIndex(userId: string, appName: string): Promise<number> {
   await ensureStorageSheetsReady();
 
-  const sheets = getSheets();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: SHEET_NAMES.USER_STORAGE_APPS,
-  });
-
-  const rows = response.data.values || [];
-  if (rows.length === 0) return -1;
-
-  const headers = rows[0];
-  const userIdCol = headers.indexOf('user_id');
-  const appNameCol = headers.indexOf('app_name');
-
-  if (userIdCol === -1 || appNameCol === -1) return -1;
-
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][userIdCol] === userId && rows[i][appNameCol] === appName) {
+  const rows = await getRows(SHEET_NAMES.USER_STORAGE_APPS);
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].user_id === userId && rows[i].app_name === appName) {
       return i;
     }
   }
