@@ -1,38 +1,25 @@
 // Configuration module - centralized environment variable access
-
-export const SPREADSHEET_ID = process.env.SPREADSHEET_ID ?? '';
-export const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_EMAIL ?? '';
-
-const rawKey = process.env.SERVICE_ACCOUNT_KEY;
-let processedKey = rawKey;
-
-if (processedKey) {
-  console.log('Key processing debug: Start length', processedKey.length);
-  // 1. Remove spaces from start/end
-  processedKey = processedKey.trim();
-  
-  // 2. Remove outer quotes if present (double or single)
-  if ((processedKey.startsWith('"') && processedKey.endsWith('"')) || 
-      (processedKey.startsWith("'") && processedKey.endsWith("'"))) {
-    processedKey = processedKey.slice(1, -1);
-    console.log('Key processing debug: Removed outer quotes');
-  }
-
-  // 3. Handle literal escaped newlines (common in Vercel/Env vars)
-  // We allow multiple passes just in case they are doubly escaped
-  if (processedKey.includes('\\n')) {
-     processedKey = processedKey.replace(/\\n/g, '\n');
-     console.log('Key processing debug: Replaced literal newlines');
-  }
-  
-  console.log('Key processing debug: Final length', processedKey.length);
-  console.log('Key processing debug: First 20 chars', processedKey.substring(0, 20));
-  console.log('Key processing debug: Last 20 chars', processedKey.substring(processedKey.length - 20));
-}
-
-export const SERVICE_ACCOUNT_KEY = processedKey;
+// NOTE: Google Sheets configuration has been deprecated. SSO now uses MongoDB + Redis.
 
 export const JWT_SECRET = process.env.JWT_SECRET || '';
+
+export const MONGODB_URI = process.env.MONGODB_URI || '';
+export const MONGODB_DEFAULT_DB = process.env.MONGODB_DEFAULT_DB || 'sso';
+export const CORE_AUTH_DB_NAME = process.env.CORE_AUTH_DB_NAME || 'core-auth';
+export const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || '';
+export const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
+
+export type AuthCoreBackend = 'sheets' | 'mongo';
+const rawCoreBackend = (process.env.AUTH_CORE_BACKEND || 'sheets').toLowerCase();
+export const AUTH_CORE_BACKEND: AuthCoreBackend = rawCoreBackend === 'mongo' ? 'mongo' : 'sheets';
+
+export type AuthOtpBackend = 'sheets' | 'redis';
+const rawOtpBackend = (process.env.AUTH_OTP_BACKEND || 'sheets').toLowerCase();
+export const AUTH_OTP_BACKEND: AuthOtpBackend = rawOtpBackend === 'redis' ? 'redis' : 'sheets';
+
+export type AuthCodeBackend = 'sheets' | 'redis';
+const rawAuthCodeBackend = (process.env.AUTH_CODE_BACKEND || 'sheets').toLowerCase();
+export const AUTH_CODE_BACKEND: AuthCodeBackend = rawAuthCodeBackend === 'redis' ? 'redis' : 'sheets';
 
 export const RESEND_CONFIG = {
   apiKey: process.env.RESEND_API_KEY || '',
@@ -51,9 +38,6 @@ export const APP_CONFIG = {
 // Validate critical configuration on startup
 export function validateConfig() {
   const required = {
-    SPREADSHEET_ID,
-    SERVICE_ACCOUNT_EMAIL,
-    SERVICE_ACCOUNT_KEY,
     JWT_SECRET,
     RESEND_API_KEY: RESEND_CONFIG.apiKey,
     RESEND_FROM_EMAIL: RESEND_CONFIG.fromEmail,
@@ -66,4 +50,12 @@ export function validateConfig() {
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
+}
+
+// Environment: 'dev' or 'prd' (explicit). Default to 'dev'.
+export const APP_ENV = (process.env.APP_ENV || 'dev').toLowerCase();
+
+export function dbNameWithEnv(baseName: string): string {
+  const env = APP_ENV === 'prd' ? 'prd' : 'dev';
+  return `${env}-${baseName}`;
 }

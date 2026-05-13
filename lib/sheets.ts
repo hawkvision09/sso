@@ -1,27 +1,4 @@
-import { google } from 'googleapis';
-import { SERVICE_ACCOUNT_EMAIL, SERVICE_ACCOUNT_KEY, SPREADSHEET_ID } from '@/lib/config';
-
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
-
-// EXACT same pattern as working coupons app
-export const getAuthClient = () => {
-  if (!SERVICE_ACCOUNT_EMAIL || !SERVICE_ACCOUNT_KEY) {
-    throw new Error('Missing Service Account Credentials in config');
-  }
-
-  const auth = new google.auth.JWT({
-    email: SERVICE_ACCOUNT_EMAIL,
-    key: SERVICE_ACCOUNT_KEY,
-    scopes: SCOPES,
-  });
-
-  return auth;
-};
-
-export const getSheets = () => {
-  const auth = getAuthClient();
-  return google.sheets({ version: 'v4', auth });
-};
+import { getMongoDb } from '@/lib/db/mongo';
 
 export const SHEET_NAMES = {
   USERS: 'Users',
@@ -49,245 +26,118 @@ const HEADERS = {
   [SHEET_NAMES.PROVIDER_CONFIG]: ['provider', 'enabled', 'client_id', 'client_secret', 'redirect_uri', 'scopes', 'root_folder', 'updated_at'],
 };
 
-function isMissingSheetError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('Unable to parse range');
+// Map sheet names to Mongo collections. This adapter preserves the original
+// `sheets.ts` function signatures but reads/writes from Mongo so we can
+// remove any dependency on Google Sheets.
+
+const SHEET_TO_COLLECTION: Record<string, string> = {
+  [SHEET_NAMES.USERS]: 'users',
+  [SHEET_NAMES.SESSIONS]: 'sessions',
+  [SHEET_NAMES.AUTH_TOKENS]: 'auth_tokens',
+  [SHEET_NAMES.SERVICES]: 'services',
+  [SHEET_NAMES.ENTITLEMENTS]: 'entitlements',
+  [SHEET_NAMES.USER_STORAGE]: 'user_storage',
+  [SHEET_NAMES.USER_STORAGE_APPS]: 'user_storage_apps',
+  [SHEET_NAMES.PROVIDER_CONFIG]: 'provider_config',
+};
+
+function rowArrayToDoc(sheetName: string, row: any[]): Record<string, any> {
+  const headers = HEADERS[sheetName] || [];
+  const doc: Record<string, any> = {};
+  headers.forEach((h, i) => {
+    doc[h] = row[i] ?? '';
+  });
+  return doc;
 }
 
-async function withSheetRecovery<T>(operation: () => Promise<T>): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (!isMissingSheetError(error)) {
-      throw error;
-    }
+function docToRowObject(doc: any, sheetName: string) {
+  const headers = HEADERS[sheetName] || [];
+  const out: Record<string, any> = {};
+  headers.forEach((h) => {
+    out[h] = doc?.[h] ?? '';
+  });
+  if (doc && doc._id) out._id = String(doc._id);
+  return out;
+}
 
-    console.warn('Detected missing sheet. Reinitializing Google Sheets schema.');
-    await initializeSheets();
-    return operation();
-  }
+async function getCollectionForSheet(sheetName: string) {
+  const collectionName = SHEET_TO_COLLECTION[sheetName];
+  if (!collectionName) throw new Error(`Unsupported sheet: ${sheetName}`);
+  const db = await getMongoDb();
+  return db.collection(collectionName);
 }
 
 export const initializeSheets = async () => {
-  const sheets = getSheets();
-  
-  try {
-    const { data } = await sheets.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_ID,
-    });
-
-    const existingSheets = data.sheets?.map(s => s.properties?.title) || [];
-    const validSheetNames = Object.values(SHEET_NAMES);
-
-    const requests = [];
-
-    // Delete extra sheets that aren't part of the SSO system
-    for (const sheet of data.sheets || []) {
-      const sheetName = sheet.properties?.title;
-      const sheetId = sheet.properties?.sheetId;
-      
-      if (sheetName && sheetId !== undefined && !validSheetNames.includes(sheetName)) {
-        console.log(`Deleting extra sheet: ${sheetName}`);
-        requests.push({
-          deleteSheet: {
-            sheetId: sheetId,
-          },
-        });
-      }
-    }
-
-    // Create missing sheets
-    for (const sheetName of validSheetNames) {
-      if (!existingSheets.includes(sheetName)) {
-        console.log(`Creating missing sheet: ${sheetName}`);
-        requests.push({
-          addSheet: {
-            properties: { title: sheetName },
-          },
-        });
-      }
-    }
-
-    if (requests.length > 0) {
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        requestBody: { requests },
-      });
-      console.log('Sheet structure updated.');
-    }
-
-    // Initialize headers for all sheets
-    for (const [sheetName, headers] of Object.entries(HEADERS)) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${sheetName}!A1`,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [headers]
-        }
-      });
-    }
-
-    console.log('Sheets initialized successfully');
-  } catch (error) {
-    console.error('Error initializing sheets:', error);
-    throw error;
-  }
+  const db = await getMongoDb();
+  await Promise.all([
+    db.collection('users').createIndex({ email: 1 }, { unique: true }).catch(() => {}),
+    db.collection('users').createIndex({ user_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('sessions').createIndex({ session_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('sessions').createIndex({ user_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('sessions').createIndex({ expires_at: 1 }).catch(() => {}),
+    db.collection('auth_tokens').createIndex({ user_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('services').createIndex({ service_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('entitlements').createIndex({ entitlement_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('user_storage').createIndex({ user_id: 1 }, { unique: true }).catch(() => {}),
+    db.collection('user_storage_apps').createIndex({ user_id: 1, app_name: 1 }, { unique: true }).catch(() => {}),
+    db.collection('provider_config').createIndex({ provider: 1 }, { unique: true }).catch(() => {}),
+  ]);
 };
 
-// Data Access Helpers
-
 export const appendRow = async (sheetName: string, row: any[]) => {
-  await withSheetRecovery(async () => {
-    const sheets = getSheets();
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: sheetName,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [row],
-      },
-    });
-  });
+  const collection = await getCollectionForSheet(sheetName);
+  const doc = rowArrayToDoc(sheetName, row);
+  await collection.insertOne(doc);
 };
 
 export const getRows = async (sheetName: string) => {
-  return withSheetRecovery(async () => {
-    const sheets = getSheets();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: sheetName,
-    });
-
-    const rows = response.data.values || [];
-    if (rows.length === 0) return [];
-
-    const headers = rows[0];
-    const data = rows.slice(1);
-
-    return data.map(row => {
-      const obj: any = {};
-      headers.forEach((header: string, index: number) => {
-        obj[header] = row[index] || '';
-      });
-      return obj;
-    });
-  });
+  const collection = await getCollectionForSheet(sheetName);
+  const docs = await collection.find({}).sort({ _id: 1 }).toArray();
+  return docs.map((d) => docToRowObject(d, sheetName));
 };
 
 export const updateRow = async (sheetName: string, range: string, row: any[]) => {
-  await withSheetRecovery(async () => {
-    const sheets = getSheets();
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!${range}`,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [row]
-      }
-    });
-  });
+  const match = range.match(/A(\d+)/i);
+  if (!match) throw new Error('Unsupported range format');
+  const index = parseInt(match[1], 10) - 1;
+  const collection = await getCollectionForSheet(sheetName);
+  const docs = await collection.find({}).sort({ _id: 1 }).toArray();
+  if (index < 0 || index >= docs.length) throw new Error('Row index out of range');
+  const targetId = docs[index]._id;
+  const doc = rowArrayToDoc(sheetName, row);
+  await collection.updateOne({ _id: targetId }, { $set: doc });
 };
 
 export const deleteRow = async (sheetName: string, rowIndex: number) => {
-  await withSheetRecovery(async () => {
-    const sheets = getSheets();
-    
-    // Get sheet ID
-    const { data } = await sheets.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_ID,
-    });
-    
-    const sheet = data.sheets?.find(s => s.properties?.title === sheetName);
-    if (!sheet || !sheet.properties?.sheetId) {
-      throw new Error(`Sheet ${sheetName} not found`);
-    }
-    
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      requestBody: {
-        requests: [{
-          deleteDimension: {
-            range: {
-              sheetId: sheet.properties.sheetId,
-              dimension: 'ROWS',
-              startIndex: rowIndex,
-              endIndex: rowIndex + 1,
-            }
-          }
-        }]
-      }
-    });
-  });
+  const collection = await getCollectionForSheet(sheetName);
+  const docs = await collection.find({}).sort({ _id: 1 }).toArray();
+  if (rowIndex < 0 || rowIndex >= docs.length) return;
+  const targetId = docs[rowIndex]._id;
+  await collection.deleteOne({ _id: targetId });
 };
 
-// Simple lookup helper
 export const findRowByColumn = async (sheetName: string, columnName: string, value: string) => {
-  const rows = await getRows(sheetName);
-  return rows.find(r => r[columnName] === value);
+  const collection = await getCollectionForSheet(sheetName);
+  const doc = await collection.findOne({ [columnName]: value });
+  return doc ? docToRowObject(doc, sheetName) : null;
 };
 
-// Find multiple rows
 export const findRowsByColumn = async (sheetName: string, columnName: string, value: string) => {
-  const rows = await getRows(sheetName);
-  return rows.filter(r => r[columnName] === value);
+  const collection = await getCollectionForSheet(sheetName);
+  const docs = await collection.find({ [columnName]: value }).toArray();
+  return docs.map((d) => docToRowObject(d, sheetName));
 };
 
-// Find row index (0-based for data rows, but we return 1-based for Sheets API)
 export const findRowIndexByColumn = async (sheetName: string, columnName: string, value: string) => {
-  return withSheetRecovery(async () => {
-    const sheets = getSheets();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: sheetName,
-    });
-
-    const rows = response.data.values || [];
-    if (rows.length === 0) return -1;
-
-    const headers = rows[0];
-    const colIndex = headers.indexOf(columnName);
-    
-    if (colIndex === -1) return -1;
-
-    // Search through rows (start from index 1 to skip header)
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][colIndex] === value) {
-        return i; // Return 0-based index (header is at 0, first data row is at 1)
-      }
-    }
-    return -1;
-  });
+  const collection = await getCollectionForSheet(sheetName);
+  const docs = await collection.find({}).sort({ _id: 1 }).toArray();
+  for (let i = 0; i < docs.length; i++) {
+    if (String(docs[i][columnName]) === String(value)) return i;
+  }
+  return -1;
 };
 
-// Delete rows by column value
 export const deleteRowsByColumn = async (sheetName: string, columnName: string, value: string) => {
-  await withSheetRecovery(async () => {
-    const sheets = getSheets();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: sheetName,
-    });
-
-    const rows = response.data.values || [];
-    if (rows.length === 0) return;
-
-    const headers = rows[0];
-    const colIndex = headers.indexOf(columnName);
-    
-    if (colIndex === -1) return;
-
-    // Find all matching row indices (in reverse order to delete from bottom to top)
-    const indicesToDelete: number[] = [];
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][colIndex] === value) {
-        indicesToDelete.push(i);
-      }
-    }
-
-    // Delete rows in reverse order
-    for (const rowIndex of indicesToDelete.reverse()) {
-      await deleteRow(sheetName, rowIndex);
-    }
-  });
+  const collection = await getCollectionForSheet(sheetName);
+  await collection.deleteMany({ [columnName]: value });
 };
