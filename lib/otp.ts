@@ -1,11 +1,6 @@
 import { Resend } from 'resend';
 import { APP_CONFIG, RESEND_CONFIG } from '@/lib/config';
-import {
-  SHEET_NAMES,
-  appendRow,
-  findRowByColumn,
-  deleteRowsByColumn,
-} from '@/lib/sheets';
+import { getOtpStore } from '@/lib/auth-storage';
 
 // Generate 6-digit OTP
 export function generateOTP(): string {
@@ -108,53 +103,15 @@ export async function storeOTP(email: string, otp: string): Promise<void> {
   const expiresAt = new Date(
     Date.now() + APP_CONFIG.otpExpiryMinutes * 60 * 1000
   ).toISOString();
-
-  // Delete any existing OTPs for this email first
-  await deleteRowsByColumn(SHEET_NAMES.OTPS, 'email', email);
-
-  await appendRow(SHEET_NAMES.OTPS, [
-    email,
-    otp,
-    expiresAt,
-    new Date().toISOString(),
-  ]);
+  await getOtpStore().storeOTP(email, otp, expiresAt);
 }
 
 // Verify OTP and delete it immediately after verification
 export async function verifyOTP(email: string, otp: string): Promise<boolean> {
-  const otpRecord = await findRowByColumn(SHEET_NAMES.OTPS, 'email', email);
-
-  if (!otpRecord) {
-    return false;
-  }
-
-  // Check if OTP matches
-  if (otpRecord.otp_code !== otp) {
-    return false;
-  }
-
-  // Check if expired
-  if (new Date(otpRecord.expires_at) < new Date()) {
-    // Delete expired OTP
-    await deleteRowsByColumn(SHEET_NAMES.OTPS, 'email', email);
-    return false;
-  }
-
-  // KEY REQUIREMENT: Delete OTP immediately after successful verification
-  await deleteRowsByColumn(SHEET_NAMES.OTPS, 'email', email);
-
-  return true;
+  return getOtpStore().verifyOTP(email, otp);
 }
 
 // Clean up expired OTPs (can be called periodically)
 export async function cleanupExpiredOTPs(): Promise<void> {
-  const sheets = await import('./sheets');
-  const otps = await sheets.getRows(SHEET_NAMES.OTPS);
-
-  const now = new Date();
-  for (const otp of otps) {
-    if (new Date(otp.expires_at) < now) {
-      await deleteRowsByColumn(SHEET_NAMES.OTPS, 'email', otp.email);
-    }
-  }
+  await getOtpStore().cleanupExpiredOTPs();
 }

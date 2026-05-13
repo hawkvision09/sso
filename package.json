@@ -6,12 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:data": "node scripts/migrate-sheets-to-mongo.mjs"
   },
   "dependencies": {
+    "@upstash/redis": "^1.35.6",
     "dotenv": "^17.2.3",
     "googleapis": "^170.1.0",
     "jsonwebtoken": "^9.0.3",
+    "mongodb": "^6.20.0",
     "next": "16.1.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
