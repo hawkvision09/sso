@@ -22,7 +22,21 @@ const SHEETS = {
 };
 
 const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
-const APP_ENV = (process.env.APP_ENV || 'dev').trim().toLowerCase() === 'prd' ? 'prd' : 'dev';
+function normalizeAppEnv(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized === 'prd' || normalized === 'prod' || normalized === 'production') {
+    return 'prd';
+  }
+
+  if (normalized === 'dev' || normalized === 'development') {
+    return 'dev';
+  }
+
+  return 'dev';
+}
+
+const APP_ENV = normalizeAppEnv(process.env.APP_ENV || (process.env.NODE_ENV === 'production' ? 'prd' : 'dev'));
 const DRY_RUN = !process.argv.includes('--execute');
 
 const MONGODB_URI = process.env.MONGODB_URI?.trim() || '';
