@@ -52,25 +52,10 @@ export function validateConfig() {
   }
 }
 
-function normalizeAppEnv(value: string | undefined): 'dev' | 'prd' {
-  const normalized = (value || '').trim().toLowerCase();
-
-  if (normalized === 'prd' || normalized === 'prod' || normalized === 'production') {
-    return 'prd';
-  }
-
-  if (normalized === 'dev' || normalized === 'development') {
-    return 'dev';
-  }
-
-  return 'dev';
-}
-
-// Environment: explicit APP_ENV wins; otherwise production runtime defaults to 'prd'.
-export const APP_ENV = normalizeAppEnv(
-  process.env.APP_ENV || (process.env.NODE_ENV === 'production' ? 'prd' : 'dev')
-);
+// Environment: 'dev' or 'prd' (explicit). Default to 'dev'.
+export const APP_ENV = (process.env.APP_ENV || 'dev').toLowerCase();
 
 export function dbNameWithEnv(baseName: string): string {
-  return `${APP_ENV}-${baseName}`;
+  const env = APP_ENV === 'prd' ? 'prd' : 'dev';
+  return `${env}-${baseName}`;
 }
