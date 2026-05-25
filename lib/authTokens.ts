@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
-import { JWT_SECRET } from '@/lib/config';
+import { AUTH_CORE_BACKEND, CORE_AUTH_DB_NAME, JWT_SECRET } from '@/lib/config';
 import {
   appendRow,
   deleteRowsByColumn,
@@ -9,6 +9,7 @@ import {
   SHEET_NAMES,
   updateRow,
 } from '@/lib/sheets';
+import { getMongoDb } from '@/lib/db/mongo';
 
 export interface AuthTokenRecord {
   user_id: string;
@@ -23,6 +24,23 @@ export interface AuthTokenRecord {
 }
 
 let authTokenSheetsChecked = false;
+let mongoIndexesReady = false;
+
+async function getAuthTokenCollection() {
+  const db = await getMongoDb(CORE_AUTH_DB_NAME);
+  const collection = db.collection<AuthTokenRecord>('auth_tokens');
+
+  if (!mongoIndexesReady) {
+    await Promise.all([
+      collection.createIndex({ user_id: 1 }, { unique: true }),
+      collection.createIndex({ session_id: 1 }),
+      collection.createIndex({ expires_at: 1 }),
+    ]);
+    mongoIndexesReady = true;
+  }
+
+  return collection;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -82,6 +100,11 @@ export function hashAuthToken(token: string): string {
 }
 
 export async function getActiveAuthTokenByUserId(userId: string): Promise<AuthTokenRecord | null> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const collection = await getAuthTokenCollection();
+    return await collection.findOne({ user_id: userId, status: 'active' });
+  }
+
   await ensureAuthTokenSheetsReady();
   const row = await findRowByColumn(SHEET_NAMES.AUTH_TOKENS, 'user_id', userId);
   return row ? mapAuthTokenRow(row) : null;
@@ -107,8 +130,6 @@ export async function persistAuthTokenRecord(params: {
   token: string;
   expiresAt: string;
 }): Promise<AuthTokenRecord> {
-  await ensureAuthTokenSheetsReady();
-
   const now = nowIso();
   const existing = await getActiveAuthTokenByUserId(params.userId);
   const existingTokenHash = existing?.token_hash || '';
@@ -123,6 +144,22 @@ export async function persistAuthTokenRecord(params: {
     created_at: existing?.created_at || now,
     updated_at: now,
   };
+
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const collection = await getAuthTokenCollection();
+    if (existingTokenHash && existingTokenHash === record.token_hash) {
+      record.created_at = existing?.created_at || record.created_at;
+    }
+
+    await collection.replaceOne(
+      { user_id: params.userId },
+      record,
+      { upsert: true }
+    );
+    return record;
+  }
+
+  await ensureAuthTokenSheetsReady();
 
   const rowIndex = await findRowIndexByColumn(SHEET_NAMES.AUTH_TOKENS, 'user_id', params.userId);
   if (rowIndex === -1) {
@@ -139,11 +176,23 @@ export async function persistAuthTokenRecord(params: {
 }
 
 export async function revokeAuthTokensByUserId(userId: string): Promise<void> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const collection = await getAuthTokenCollection();
+    await collection.deleteMany({ user_id: userId });
+    return;
+  }
+
   await ensureAuthTokenSheetsReady();
   await deleteRowsByColumn(SHEET_NAMES.AUTH_TOKENS, 'user_id', userId);
 }
 
 export async function revokeAuthTokensBySessionId(sessionId: string): Promise<void> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const collection = await getAuthTokenCollection();
+    await collection.deleteMany({ session_id: sessionId });
+    return;
+  }
+
   await ensureAuthTokenSheetsReady();
   await deleteRowsByColumn(SHEET_NAMES.AUTH_TOKENS, 'session_id', sessionId);
 }
@@ -153,8 +202,6 @@ export async function validateAuthTokenAgainstStore(params: {
   sessionId: string;
   token: string;
 }): Promise<AuthTokenRecord | null> {
-  await ensureAuthTokenSheetsReady();
-
   const record = await getActiveAuthTokenByUserId(params.userId);
   if (!record || record.status !== 'active') return null;
   if (record.session_id !== params.sessionId) return null;
