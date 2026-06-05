@@ -17,14 +17,15 @@ export async function POST(
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const result = await service.clearProductData(productId);
 
     return NextResponse.json({ success: true, ...result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to clear product data:', error);
-    return NextResponse.json({ error: `Failed to clear product data: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to clear product data: ${message}` }, { status: 500 });
   }
 }

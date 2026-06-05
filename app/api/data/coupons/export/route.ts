@@ -6,9 +6,9 @@ export async function GET(request: NextRequest) {
     try {
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         const coupons = await couponService.getAllCoupons();
 
         const headers = [
@@ -47,8 +47,9 @@ export async function GET(request: NextRequest) {
                 'Content-Disposition': `attachment; filename="coupons-${new Date().toISOString().split('T')[0]}.csv"`,
             },
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to export coupons:', error);
-        return NextResponse.json({ error: `Failed to export coupons: ${error.message}` }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Failed to export coupons: ${message}` }, { status: 500 });
     }
 }

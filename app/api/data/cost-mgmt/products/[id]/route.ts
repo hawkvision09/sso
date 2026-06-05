@@ -17,14 +17,15 @@ export async function DELETE(
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const result = await service.deleteProduct(productId);
 
     return NextResponse.json({ success: true, ...result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to delete product:', error);
-    return NextResponse.json({ error: `Failed to delete product: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to delete product: ${message}` }, { status: 500 });
   }
 }

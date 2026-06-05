@@ -1,27 +1,67 @@
 @import "tailwindcss";
 
+:root {
+  --theme-background: #f7f7f4;
+  --theme-background-soft: #fbfbf8;
+  --theme-surface: #ffffff;
+  --theme-surface-soft: #f8fafc;
+  --theme-border: rgba(15, 23, 42, 0.1);
+  --theme-text: #0f172a;
+  --theme-muted: rgba(15, 23, 42, 0.6);
+  --theme-accent: #0f172a;
+  --theme-accent-hover: #1e293b;
+  --theme-accent-foreground: #ffffff;
+  --theme-success-bg: #ecfdf5;
+  --theme-success-border: #a7f3d0;
+  --theme-success-text: #047857;
+  --theme-danger-bg: #fef2f2;
+  --theme-danger-border: #fecaca;
+  --theme-danger-text: #b91c1c;
+  --theme-selection: rgba(15, 23, 42, 0.12);
+  --theme-shadow: 0 20px 80px rgba(15, 23, 42, 0.08);
+  --theme-scrollbar-track: rgba(15, 23, 42, 0.06);
+  --theme-scrollbar-thumb: rgba(15, 23, 42, 0.24);
+  --theme-scrollbar-thumb-hover: rgba(15, 23, 42, 0.36);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--theme-background);
+  color: var(--theme-text);
+  font-family: var(--font-sans);
+}
+
+html[data-theme="woxin"] {
+  color-scheme: light;
+}
+
+html[data-theme="woxin-dark"] {
+  color-scheme: dark;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--theme-selection);
+}
+
 /* Custom scrollbar styling */
 ::-webkit-scrollbar {
   width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--theme-scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.5);
+  background: var(--theme-scrollbar-thumb);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.7);
-}
-
-/* Custom theme extensions */
-@theme {
-  --color-primary-start: #667eea;
-  --color-primary-end: #764ba2;
-  --color-glass-bg: rgba(255, 255, 255, 0.05);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
+  background: var(--theme-scrollbar-thumb-hover);
 }

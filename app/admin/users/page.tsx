@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface User {
   user_id: string;
@@ -12,11 +11,10 @@ interface User {
 }
 
 export default function AdminUsersPage() {
-  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,11 +48,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const toggleRole = async (
-    userId: string,
-    role: string,
-    currentlyHas: boolean,
-  ) => {
+  const toggleRole = async (userId: string, role: string, currentlyHas: boolean) => {
     try {
       setUpdatingUserId(userId);
       setError("");
@@ -75,14 +69,8 @@ export default function AdminUsersPage() {
         throw new Error(data.error || "Failed to update user role");
       }
 
-      // Update local state
-      setUsers(
-        users.map((u) =>
-          u.user_id === userId ? { ...u, roles: data.user.roles } : u,
-        ),
-      );
+      setUsers(users.map((u) => (u.user_id === userId ? { ...u, roles: data.user.roles } : u)));
 
-      // Show success message briefly
       setTimeout(() => {
         setUpdatingUserId(null);
       }, 1000);
@@ -109,8 +97,8 @@ export default function AdminUsersPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white">Loading users...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-black/20 border-t-black" />
+          <p className="text-black/70">Loading users...</p>
         </div>
       </div>
     );
@@ -118,180 +106,159 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      {/* Error Banner */}
-      {error && (
-        <div className="mx-12 mt-6 p-4 bg-red-500/20 border border-red-500/30 rounded-lg flex justify-between items-center">
-          <span className="text-red-200">⚠️ {error}</span>
-          <button
-            onClick={() => setError("")}
-            className="text-red-200 hover:text-white transition-colors"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <main className="px-12 py-8">
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 text-center">
-            <div className="text-4xl font-bold text-white mb-2">
-              {users.length}
-            </div>
-            <div className="text-white/60 text-sm">Total Users</div>
+      {error ? (
+        <div className="mx-auto mt-6 max-w-7xl px-6 md:px-12">
+          <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
+            <span className="text-sm text-red-700">{error}</span>
+            <button
+              onClick={() => setError("")}
+              className="text-red-500 transition-colors hover:text-red-700"
+            >
+              ×
+            </button>
           </div>
-          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 text-center">
-            <div className="text-4xl font-bold text-white mb-2">
+        </div>
+      ) : null}
+
+      <main className="mx-auto max-w-7xl px-6 py-10 md:px-12 md:py-12">
+        <div className="mb-8">
+          <h2 className="text-sm uppercase tracking-[0.3em] text-black/40">Admin Users</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-black/55 md:text-base">
+            Review user access and assign roles without leaving the standard dashboard chrome.
+          </p>
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="rounded-3xl border border-black/10 bg-white p-6 text-center shadow-sm">
+            <div className="mb-2 text-4xl font-bold text-black">{users.length}</div>
+            <div className="text-sm text-black/50">Total Users</div>
+          </div>
+          <div className="rounded-3xl border border-black/10 bg-white p-6 text-center shadow-sm">
+            <div className="mb-2 text-4xl font-bold text-black">
               {users.filter((u) => u.roles.includes("admin")).length}
             </div>
-            <div className="text-white/60 text-sm">Admins</div>
+            <div className="text-sm text-black/50">Admins</div>
           </div>
-          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 text-center">
-            <div className="text-4xl font-bold text-white mb-2">
+          <div className="rounded-3xl border border-black/10 bg-white p-6 text-center shadow-sm">
+            <div className="mb-2 text-4xl font-bold text-black">
               {users.filter((u) => u.status === "active").length}
             </div>
-            <div className="text-white/60 text-sm">Active Users</div>
+            <div className="text-sm text-black/50">Active Users</div>
           </div>
         </div>
 
-        {/* Users Table */}
-        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden">
+        <div className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-white/5 border-b border-white/10">
+              <thead className="border-b border-black/10 bg-black/[0.03]">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-black/50">
                     Email
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-black/50">
                     Roles
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-black/50">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-black/50">
                     Created
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-black/50">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-black/5">
                 {users.map((user) => (
                   <tr
                     key={user.user_id}
-                    className={`hover:bg-white/5 transition-colors ${
-                      user.user_id === currentUser?.user_id
-                        ? "bg-purple-500/10"
-                        : ""
-                    }`}
+                    className={user.user_id === currentUser?.user_id ? "bg-black/[0.02]" : "hover:bg-black/[0.02]"}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-white font-medium">
-                          {user.email}
-                        </span>
-                        {user.user_id === currentUser?.user_id && (
-                          <span className="px-2 py-0.5 bg-purple-500/30 text-purple-200 text-xs font-bold rounded">
+                        <span className="font-medium text-black/80">{user.email}</span>
+                        {user.user_id === currentUser?.user_id ? (
+                          <span className="rounded-full bg-black px-2 py-0.5 text-xs font-bold text-white">
                             You
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {user.roles.map((role) => (
                           <span
                             key={role}
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
                               role === "admin"
-                                ? "bg-red-500/20 text-red-300"
-                                : "bg-blue-500/20 text-blue-300"
+                                ? "bg-amber-500/10 text-amber-700"
+                                : "bg-sky-500/10 text-sky-700"
                             }`}
                           >
-                            {role === "admin" ? "👑 Admin" : "👤 User"}
+                            {role}
                           </span>
                         ))}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                        className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
                           user.status === "active"
-                            ? "bg-green-500/20 text-green-300"
-                            : "bg-red-500/20 text-red-300"
+                            ? "bg-emerald-500/10 text-emerald-700"
+                            : "bg-red-500/10 text-red-700"
                         }`}
                       >
                         {user.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-white/60 text-sm">
-                      {formatDate(user.created_at)}
-                    </td>
+                    <td className="px-6 py-4 text-sm text-black/55">{formatDate(user.created_at)}</td>
                     <td className="px-6 py-4">
                       {updatingUserId === user.user_id ? (
-                        <span className="text-white/50 italic text-sm">
-                          Updating...
-                        </span>
+                        <span className="text-sm italic text-black/45">Updating...</span>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() =>
-                              toggleRole(
-                                user.user_id,
-                                "admin",
-                                user.roles.includes("admin"),
-                              )
+                              toggleRole(user.user_id, "admin", user.roles.includes("admin"))
                             }
                             disabled={
                               updatingUserId !== null ||
-                              (user.user_id === currentUser?.user_id &&
-                                user.roles.includes("admin"))
+                              (user.user_id === currentUser?.user_id && user.roles.includes("admin"))
                             }
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                               user.roles.includes("admin")
-                                ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                                : "bg-white/5 text-white/70 border border-white/20 hover:bg-white/10"
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                ? "bg-amber-500/10 text-amber-700"
+                                : "border border-black/10 bg-black/[0.03] text-black/70 hover:bg-black/[0.06]"
+                            }`}
                             title={
-                              user.user_id === currentUser?.user_id &&
-                              user.roles.includes("admin")
+                              user.user_id === currentUser?.user_id && user.roles.includes("admin")
                                 ? "Cannot remove your own admin role"
                                 : ""
                             }
                           >
-                            {user.roles.includes("admin")
-                              ? "✓ Admin"
-                              : "+ Admin"}
+                            {user.roles.includes("admin") ? "Admin" : "+ Admin"}
                           </button>
                           <button
                             onClick={() =>
-                              toggleRole(
-                                user.user_id,
-                                "user",
-                                user.roles.includes("user"),
-                              )
+                              toggleRole(user.user_id, "user", user.roles.includes("user"))
                             }
                             disabled={
                               updatingUserId !== null ||
-                              (user.roles.length === 1 &&
-                                user.roles.includes("user"))
+                              (user.roles.length === 1 && user.roles.includes("user"))
                             }
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                               user.roles.includes("user")
-                                ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                                : "bg-white/5 text-white/70 border border-white/20 hover:bg-white/10"
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                ? "bg-sky-500/10 text-sky-700"
+                                : "border border-black/10 bg-black/[0.03] text-black/70 hover:bg-black/[0.06]"
+                            }`}
                             title={
-                              user.roles.length === 1 &&
-                              user.roles.includes("user")
+                              user.roles.length === 1 && user.roles.includes("user")
                                 ? "User must have at least one role"
                                 : ""
                             }
                           >
-                            {user.roles.includes("user") ? "✓ User" : "+ User"}
+                            {user.roles.includes("user") ? "User" : "+ User"}
                           </button>
                         </div>
                       )}
@@ -301,11 +268,11 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
 
-            {users.length === 0 && (
-              <div className="text-center py-20">
-                <p className="text-white/60">No users found</p>
+            {users.length === 0 ? (
+              <div className="py-20 text-center">
+                <p className="text-black/50">No users found.</p>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </main>

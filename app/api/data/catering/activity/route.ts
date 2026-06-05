@@ -7,13 +7,14 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
     const logs = await service.getActivityLogs();
 
     return NextResponse.json(logs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch catering activity:', error);
-    return NextResponse.json({ error: `Failed to fetch activity logs: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch activity logs: ${message}` }, { status: 500 });
   }
 }

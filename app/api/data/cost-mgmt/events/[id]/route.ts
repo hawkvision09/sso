@@ -17,8 +17,8 @@ export async function PATCH(
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const updated = await service.updateEventStatus(id, body.status);
     if (!updated) {
@@ -26,8 +26,9 @@ export async function PATCH(
     }
 
     return NextResponse.json({ success: true, event_id: id, status: body.status });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to update cost event status:', error);
-    return NextResponse.json({ error: `Failed to update event: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to update event: ${message}` }, { status: 500 });
   }
 }

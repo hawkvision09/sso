@@ -52,10 +52,8 @@ export function validateConfig() {
   }
 }
 
-// Environment: 'dev' or 'prd' (explicit). Default to 'dev'.
-export const APP_ENV = (process.env.APP_ENV || 'dev').toLowerCase();
-
 export function dbNameWithEnv(baseName: string): string {
+  const APP_ENV = (process.env.APP_ENV || 'dev').toLowerCase();
   const env = APP_ENV === 'prd' ? 'prd' : 'dev';
   return `${env}-${baseName}`;
 }

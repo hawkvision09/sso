@@ -16,8 +16,8 @@ export async function POST(
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
 
     const success = await service.updateProposalNegotiation(id, body);
     if (!success) {
@@ -25,8 +25,9 @@ export async function POST(
     }
 
     return NextResponse.json({ success: true, message: 'Negotiation updated successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to update proposal negotiation:', error);
-    return NextResponse.json({ error: `Failed to update negotiation details: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to update negotiation details: ${message}` }, { status: 500 });
   }
 }

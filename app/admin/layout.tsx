@@ -1,9 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import AppsDrawer from "../components/AppsDrawer";
+import DashboardHeader from "../components/DashboardHeader";
 import PageLayout from "../components/PageLayout";
-import Header from "../components/Header";
+import { getServiceLaunchUrl } from "@/lib/service-launch";
+
+interface User {
+  user_id: string;
+  email: string;
+  roles: string[];
+  status: string;
+}
+
+interface Service {
+  service_id: string;
+  name: string;
+  redirect_url: string;
+}
 
 export default function AdminLayout({
   children,
@@ -11,81 +26,87 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const [user, setUser] = useState<User | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [isAppsNavOpen, setIsAppsNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check admin access
-    const checkAuth = async () => {
+    const initialize = async () => {
       try {
         const res = await fetch("/api/auth/me");
         if (!res.ok) {
           router.push("/login");
           return;
         }
+
         const data = await res.json();
         if (!data.user.roles.includes("admin")) {
           router.push("/dashboard");
           return;
         }
-        setLoading(false);
-      } catch (err) {
+
+        setUser(data.user);
+
+        const servicesRes = await fetch("/api/services");
+        if (servicesRes.ok) {
+          const servicesData = await servicesRes.json();
+          setServices(servicesData.services || []);
+        }
+      } catch {
         router.push("/login");
+        return;
+      } finally {
+        setLoading(false);
       }
     };
 
-    checkAuth();
+    initialize();
   }, [router]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white">Loading...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-black/20 border-t-black" />
+          <p className="text-black">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Determine header props based on current path
-  const isUsersPage = pathname === "/admin/users";
-  const headerTitle = isUsersPage ? "User Management" : "Admin Panel";
-  const headerIcon = isUsersPage ? "👥" : "⚙️";
-
   return (
     <PageLayout>
-      <Header
-        title={headerTitle}
-        icon={headerIcon}
-        actions={
-          isUsersPage ? (
-            // User Management page actions
-            <button
-              onClick={() => router.push("/admin")}
-              className="px-5 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white font-semibold hover:bg-white/15 transition-all"
-            >
-              ← Back to Admin
-            </button>
-          ) : (
-            // Admin Panel page actions
-            <>
-              <button
-                onClick={() => router.push("/admin/users")}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-purple-800 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all"
-              >
-                👥 User Management
-              </button>
-              <button
-                onClick={() => router.push("/dashboard")}
-                className="px-5 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white font-semibold hover:bg-white/15 transition-all"
-              >
-                ← Back to Dashboard
-              </button>
-            </>
-          )
-        }
+      <DashboardHeader
+        title="Woxin"
+        user={user || undefined}
+        profileHref="/dashboard/profile"
+        settingsHref="/dashboard/settings"
+        onAppsToggle={() => setIsAppsNavOpen((current) => !current)}
+        onLogout={handleLogout}
       />
+
+      <AppsDrawer
+        isOpen={isAppsNavOpen}
+        onClose={() => setIsAppsNavOpen(false)}
+        apps={services.map((service) => ({
+          id: service.service_id,
+          name: service.name,
+          href: getServiceLaunchUrl(service),
+        }))}
+        adminServicesHref="/admin"
+        adminUsersHref="/admin/users"
+      />
+
       {children}
     </PageLayout>
   );

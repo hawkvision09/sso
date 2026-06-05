@@ -12,17 +12,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required query param: product_id' }, { status: 400 });
     }
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
     const availableFunds = await service.getAvailableFunds(productId);
 
     return NextResponse.json({
       product_id: productId,
       available_funds: availableFunds,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch available funds:', error);
-    return NextResponse.json({ error: `Failed to fetch available funds: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch available funds: ${message}` }, { status: 500 });
   }
 }
 
@@ -43,8 +44,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'available_funds must be a non-negative number' }, { status: 400 });
     }
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const updated = await service.upsertAvailableFunds(productId, availableFunds);
 
@@ -52,8 +53,9 @@ export async function PUT(request: NextRequest) {
       success: true,
       ...updated,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save available funds:', error);
-    return NextResponse.json({ error: `Failed to save available funds: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to save available funds: ${message}` }, { status: 500 });
   }
 }

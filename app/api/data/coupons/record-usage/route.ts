@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     try {
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
 
         const body = await request.json();
         const { couponCode, userId, userEmail, orderAmount, discountAmount, finalAmount } = body;
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         await couponService.recordCouponUsage(couponCode, {
             userId,
             userEmail,
@@ -31,8 +31,9 @@ export async function POST(request: NextRequest) {
             success: true,
             stats: { recorded: true },
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to record coupon usage:', error);
-        return NextResponse.json({ error: `Failed to record coupon usage: ${error.message}` }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Failed to record coupon usage: ${message}` }, { status: 500 });
     }
 }
