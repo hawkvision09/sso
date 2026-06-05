@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CouponService } from '@/lib/storage/coupon-service';
+import type { Coupon } from '@/lib/storage/coupon-service';
 import { resolveCouponRequestContext } from '@/app/api/data/coupons/_context';
 
 // GET /api/data/coupons/[code]
@@ -11,9 +12,9 @@ export async function GET(
         const { code } = await params;
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         const coupon = await couponService.getCouponByCode(code);
 
         if (!coupon) {
@@ -24,10 +25,11 @@ export async function GET(
         }
 
         return NextResponse.json({ coupon });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to fetch coupon:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
-            { error: `Failed to fetch coupon: ${error.message}` },
+            { error: `Failed to fetch coupon: ${message}` },
             { status: 500 }
         );
     }
@@ -42,7 +44,7 @@ export async function PUT(
         const { code } = await params;
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
         const body = await request.json();
 
         const parseCommaSeparated = (value: string | undefined): string[] => {
@@ -50,7 +52,7 @@ export async function PUT(
             return value.split(',').map(item => item.trim()).filter(item => item !== '');
         };
 
-        const updates: any = {};
+        const updates: Partial<Coupon> = {};
         
         if (body.type) updates.type = body.type;
         if (body.value !== undefined) updates.value = Number(body.value);
@@ -68,7 +70,7 @@ export async function PUT(
         if (body.applyOnSale !== undefined) updates.applyOnSale = body.applyOnSale === true || body.applyOnSale === 'true';
         if (body.description !== undefined) updates.description = body.description;
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         await couponService.updateCoupon(code, updates);
 
         const updated = await couponService.getCouponByCode(code);
@@ -78,10 +80,11 @@ export async function PUT(
             coupon: updated,
             message: 'Coupon updated successfully',
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to update coupon:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
-            { error: `Failed to update coupon: ${error.message}` },
+            { error: `Failed to update coupon: ${message}` },
             { status: 500 }
         );
     }
@@ -96,19 +99,20 @@ export async function DELETE(
         const { code } = await params;
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         await couponService.deleteCoupon(code);
 
         return NextResponse.json({
             success: true,
             message: `Coupon "${code}" deleted successfully`,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to delete coupon:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
-            { error: `Failed to delete coupon: ${error.message}` },
+            { error: `Failed to delete coupon: ${message}` },
             { status: 500 }
         );
     }

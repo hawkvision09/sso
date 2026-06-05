@@ -10,7 +10,7 @@ export async function POST(
         const { code } = await params;
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
         const body = await request.json();
         const { newCode } = body;
 
@@ -21,7 +21,7 @@ export async function POST(
             );
         }
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         await couponService.duplicateCoupon(code, newCode);
 
         const duplicated = await couponService.getCouponByCode(newCode);
@@ -31,10 +31,11 @@ export async function POST(
             coupon: duplicated,
             message: `Coupon "${code}" duplicated as "${newCode}"`,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to duplicate coupon:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
-            { error: `Failed to duplicate coupon: ${error.message}` },
+            { error: `Failed to duplicate coupon: ${message}` },
             { status: 500 }
         );
     }

@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const productId = request.nextUrl.searchParams.get('product_id');
     if (!productId) {
@@ -17,9 +17,10 @@ export async function GET(request: NextRequest) {
 
     const timeline = await service.getTimelineCache(productId);
     return NextResponse.json({ timeline });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch timeline cache:', error);
-    return NextResponse.json({ error: `Failed to fetch timeline cache: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch timeline cache: ${message}` }, { status: 500 });
   }
 }
 
@@ -28,8 +29,8 @@ export async function PUT(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
     const body = (await request.json()) as CostTimelineCache;
 
     if (!body?.product_id) {
@@ -48,9 +49,10 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, timeline });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to upsert timeline cache:', error);
-    return NextResponse.json({ error: `Failed to upsert timeline cache: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to upsert timeline cache: ${message}` }, { status: 500 });
   }
 }
 
@@ -59,14 +61,14 @@ export async function POST(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const productIdFromQuery = request.nextUrl.searchParams.get('product_id');
     let productId = productIdFromQuery ? String(productIdFromQuery).trim() : '';
 
     if (!productId) {
-      const body = await request.json().catch(() => ({} as any));
+      const body = await request.json().catch(() => ({} as { product_id?: string }));
       productId = String(body?.product_id || '').trim();
     }
 
@@ -76,8 +78,9 @@ export async function POST(request: NextRequest) {
 
     const result = await service.pruneTimelineCache(productId);
     return NextResponse.json({ success: true, ...result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to prune timeline cache:', error);
-    return NextResponse.json({ error: `Failed to prune timeline cache: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to prune timeline cache: ${message}` }, { status: 500 });
   }
 }

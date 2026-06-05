@@ -164,25 +164,29 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]">
-        {/* Animated gradient orbs */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-pulse delay-2000" />
+    <div className="relative min-h-screen overflow-hidden bg-[#f7f7f4] text-slate-950">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-20 top-0 h-80 w-80 rounded-full bg-black/[0.04] blur-3xl" />
+        <div className="absolute right-0 top-1/4 h-96 w-96 rounded-full bg-black/[0.03] blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-black/[0.025] blur-3xl" />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-8 shadow-2xl">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-6 py-10 md:px-12">
+        <div className="w-full max-w-lg rounded-3xl border border-black/10 bg-white p-8 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:p-10">
           {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="text-5xl">🔐</div>
-              <h1 className="text-3xl font-bold text-white">Woxin</h1>
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-black/10 bg-slate-50 text-2xl shadow-sm">
+              <img src="/woxin-logo.svg" alt="Woxin Logo" className="h-8 w-8" />
             </div>
-            <p className="text-white/70">Secure Single Sign-On</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-black/45">
+              Woxin SSO
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+              Secure Single Sign-On
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-slate-600 md:text-base">
+              Sign in with a one-time code to continue to your applications.
+            </p>
           </div>
 
           {/* Email Step */}
@@ -191,7 +195,7 @@ function LoginForm() {
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-sm font-semibold text-white/90 mb-2"
+                  className="mb-2 block text-sm font-semibold text-slate-900"
                 >
                   Email Address
                 </label>
@@ -204,18 +208,18 @@ function LoginForm() {
                   required
                   disabled={loading}
                   autoFocus
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:opacity-50"
+                  className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-slate-950 placeholder:text-slate-400 shadow-sm transition-all focus:border-black/20 focus:outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
                 />
               </div>
 
               {error && (
-                <div className="p-4 bg-red-500/20 border border-red-500/30 rounded-lg text-red-200 text-sm">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                   {error}
                 </div>
               )}
 
               {success && (
-                <div className="p-4 bg-green-500/20 border border-green-500/30 rounded-lg text-green-200 text-sm">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
                   {success}
                 </div>
               )}
@@ -223,11 +227,11 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-purple-800 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                     Sending...
                   </>
                 ) : (
@@ -236,7 +240,7 @@ function LoginForm() {
               </button>
 
               {serviceId && (
-                <div className="p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-200 text-sm text-center">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center text-sm text-slate-600">
                   You&apos;ll be redirected to your application after login
                 </div>
               )}
@@ -247,7 +251,7 @@ function LoginForm() {
               <div>
                 <label
                   htmlFor="otp"
-                  className="block text-sm font-semibold text-white/90 mb-2"
+                  className="mb-2 block text-sm font-semibold text-slate-900"
                 >
                   Enter 6-Digit Code
                 </label>
@@ -263,15 +267,15 @@ function LoginForm() {
                   disabled={loading}
                   autoFocus
                   maxLength={6}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-center text-2xl font-mono tracking-widest placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:opacity-50"
+                  className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-center font-mono text-2xl tracking-widest text-slate-950 shadow-sm transition-all placeholder:text-slate-400 focus:border-black/20 focus:outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
                 />
-                <p className="mt-2 text-sm text-white/60">
+                <p className="mt-2 text-sm text-slate-500">
                   Check your email for the code
                 </p>
               </div>
 
               {error && (
-                <div className="p-4 bg-red-500/20 border border-red-500/30 rounded-lg text-red-200 text-sm">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                   {error}
                 </div>
               )}
@@ -279,11 +283,11 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-purple-800 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                     Verifying...
                   </>
                 ) : (
@@ -292,7 +296,7 @@ function LoginForm() {
               </button>
 
               {success && (
-                <div className="p-4 bg-green-500/20 border border-green-500/30 rounded-lg text-green-200 text-sm">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
                   {success}
                 </div>
               )}
@@ -301,7 +305,7 @@ function LoginForm() {
                 type="button"
                 onClick={handleResendOTP}
                 disabled={loading || resendCountdown > 0}
-                className="w-full py-3 px-6 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl border border-black/10 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading
                   ? "Please wait..."
@@ -319,7 +323,7 @@ function LoginForm() {
                   setSuccess("");
                 }}
                 disabled={loading}
-                className="w-full py-3 px-6 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl border border-black/10 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 ← Back to Email
               </button>
@@ -327,8 +331,8 @@ function LoginForm() {
           )}
 
           {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-white/50 text-sm">
+          <div className="mt-8 border-t border-black/10 pt-6 text-center">
+            <p className="text-sm text-black/45">
               Secure authentication powered by Woxin
             </p>
           </div>
@@ -342,7 +346,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]" />
+        <div className="min-h-screen bg-[#f7f7f4]" />
       }
     >
       <LoginForm />

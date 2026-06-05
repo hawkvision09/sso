@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
     const proposals = await service.getAllProposals();
 
     proposals.sort((a, b) => {
@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(proposals);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch catering proposals:', error);
-    return NextResponse.json({ error: `Failed to fetch proposals: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch proposals: ${message}` }, { status: 500 });
   }
 }
 
@@ -41,8 +42,8 @@ export async function POST(request: NextRequest) {
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId, userEmail } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId, userEmail } = resolved.context;
+    const service = new CateringService(userId);
     const body = await request.json();
 
     const { proposalId, clientName, contactNumber, email, eventDate, guestCount, eventType, appBaseUrl } = body;
@@ -71,8 +72,9 @@ export async function POST(request: NextRequest) {
       proposalId,
       message: 'Proposal created successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to create catering proposal:', error);
-    return NextResponse.json({ error: `Failed to create proposal: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to create proposal: ${message}` }, { status: 500 });
   }
 }

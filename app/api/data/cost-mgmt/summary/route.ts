@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const productId = request.nextUrl.searchParams.get('product_id');
     if (!productId) {
@@ -18,9 +18,10 @@ export async function GET(request: NextRequest) {
     const summary = await service.getSummary(productId);
 
     return NextResponse.json({ summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch cost summary:', error);
-    return NextResponse.json({ error: `Failed to fetch summary: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch summary: ${message}` }, { status: 500 });
   }
 }
 
@@ -29,13 +30,13 @@ export async function PUT(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
     const body = (await request.json()) as CostSummary;
 
-    const required = ['product_id', 'monthly_burn', 'calculated_at'];
+    const required = ['product_id', 'monthly_burn', 'calculated_at'] as const;
     for (const field of required) {
-      if ((body as any)[field] === undefined || (body as any)[field] === null || (body as any)[field] === '') {
+      if (body[field] === undefined || body[field] === null || body[field] === '') {
         return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 });
       }
     }
@@ -43,8 +44,9 @@ export async function PUT(request: NextRequest) {
     const summary = await service.upsertSummary(body);
 
     return NextResponse.json({ success: true, summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to upsert cost summary:', error);
-    return NextResponse.json({ error: `Failed to upsert summary: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to upsert summary: ${message}` }, { status: 500 });
   }
 }
