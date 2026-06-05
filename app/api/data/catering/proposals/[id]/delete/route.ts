@@ -18,8 +18,8 @@ export async function DELETE(
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
 
     const success = await service.deleteProposal(id, status);
     if (!success) {
@@ -27,8 +27,9 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to delete proposal:', error);
-    return NextResponse.json({ error: `Failed to delete proposal: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to delete proposal: ${message}` }, { status: 500 });
   }
 }

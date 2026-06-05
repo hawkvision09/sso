@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CouponService } from '@/lib/storage/coupon-service';
 import { resolveCouponRequestContext } from '@/app/api/data/coupons/_context';
 
+type BulkImportError = {
+    code: string;
+    error: string;
+};
+
 export async function POST(request: NextRequest) {
     try {
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId, userEmail } = resolved.context;
+        const { userId, userEmail } = resolved.context;
 
         const body = await request.json();
         const coupons = Array.isArray(body.coupons) ? body.coupons : [];
@@ -15,11 +20,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'coupons must be a non-empty array' }, { status: 400 });
         }
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
 
         let created = 0;
         let skipped = 0;
-        const errors: any[] = [];
+        const errors: BulkImportError[] = [];
 
         for (const input of coupons) {
             try {
@@ -53,15 +58,19 @@ export async function POST(request: NextRequest) {
                 });
 
                 created++;
-            } catch (error: any) {
+            } catch (error: unknown) {
                 skipped++;
-                errors.push({ code: input.code || 'UNKNOWN', error: error.message });
+                errors.push({
+                    code: input.code || 'UNKNOWN',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
             }
         }
 
         return NextResponse.json({ success: true, created, skipped, errors });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to bulk import coupons:', error);
-        return NextResponse.json({ error: `Failed to bulk import coupons: ${error.message}` }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Failed to bulk import coupons: ${message}` }, { status: 500 });
     }
 }

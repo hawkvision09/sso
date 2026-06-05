@@ -17,14 +17,15 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CostMgmtService(userId);
 
     const products = await service.getProductsIncludingInferred();
     return NextResponse.json({ products, count: products.length });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch products:', error);
-    return NextResponse.json({ error: `Failed to fetch products: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch products: ${message}` }, { status: 500 });
   }
 }
 
@@ -33,8 +34,8 @@ export async function POST(request: NextRequest) {
     const resolved = await resolveCostMgmtRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId, userEmail } = resolved.context;
-    const service = new CostMgmtService(accessToken, spreadsheetId);
+    const { userId, userEmail } = resolved.context;
+    const service = new CostMgmtService(userId);
     const body = await request.json();
 
     const name = String(body.name || '').trim();
@@ -65,9 +66,10 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to create product:', error);
-    const status = /already exists/i.test(String(error?.message || '')) ? 409 : 500;
-    return NextResponse.json({ error: `Failed to create product: ${error.message}` }, { status });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    const status = /already exists/i.test(message) ? 409 : 500;
+    return NextResponse.json({ error: `Failed to create product: ${message}` }, { status });
   }
 }

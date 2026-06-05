@@ -27,8 +27,8 @@ export async function GET(
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
 
     const [proposal, latestVersion] = await Promise.all([
       service.getProposal(id),
@@ -43,9 +43,10 @@ export async function GET(
       ...proposal,
       latestVersion,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch catering proposal:', error);
-    return NextResponse.json({ error: `Failed to fetch proposal: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to fetch proposal: ${message}` }, { status: 500 });
   }
 }
 
@@ -73,8 +74,8 @@ export async function PUT(
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
 
     const success = await service.updateProposalDetails(id, {
       clientName,
@@ -102,8 +103,9 @@ export async function PUT(
         latestVersion,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to update catering proposal details:', error);
-    return NextResponse.json({ error: `Failed to update proposal details: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to update proposal details: ${message}` }, { status: 500 });
   }
 }

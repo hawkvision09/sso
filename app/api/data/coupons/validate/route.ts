@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     try {
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
 
         const body = await request.json();
         const { couponCode, orderAmount = 0, userEmail, userType = 'user', products = [], categories = [] } = body;
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ valid: false, reason: 'Missing couponCode' }, { status: 400 });
         }
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         const coupon = await couponService.getCouponByCode(couponCode);
 
         if (!coupon) {
@@ -54,8 +54,9 @@ export async function POST(request: NextRequest) {
             discount,
             finalAmount,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to validate coupon:', error);
-        return NextResponse.json({ error: `Failed to validate coupon: ${error.message}` }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Failed to validate coupon: ${message}` }, { status: 500 });
     }
 }

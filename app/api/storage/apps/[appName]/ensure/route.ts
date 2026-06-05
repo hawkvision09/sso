@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { ensureAppContainer } from '@/lib/storage/service';
 import { getAuthenticatedUserFromRequest } from '@/lib/session';
+import { CateringService } from '@/lib/storage/catering-service';
+import { CouponService } from '@/lib/storage/coupon-service';
+import { CostMgmtService } from '@/lib/storage/cost-mgmt-service';
 
 export async function POST(
   request: Request,
@@ -13,6 +16,44 @@ export async function POST(
     }
 
     const { appName } = await params;
+    const normalizedAppName = appName.trim().toLowerCase();
+
+    if (normalizedAppName === 'catering') {
+      const service = new CateringService(user.user_id);
+      await service.ensureSheets();
+
+      return NextResponse.json({
+        success: true,
+        appName: normalizedAppName,
+        containerId: `mongo:${user.user_id}:catering`,
+        schemaVersion: 'v2-mongo',
+      });
+    }
+
+    if (normalizedAppName === 'coupons') {
+      const service = new CouponService(user.user_id);
+      await service.ensureCouponSheets();
+
+      return NextResponse.json({
+        success: true,
+        appName: normalizedAppName,
+        containerId: `mongo:${user.user_id}:coupons`,
+        schemaVersion: 'v2-mongo',
+      });
+    }
+
+    if (normalizedAppName === 'cost-mgmt') {
+      const service = new CostMgmtService(user.user_id);
+      await service.ensureSheets();
+
+      return NextResponse.json({
+        success: true,
+        appName: normalizedAppName,
+        containerId: `mongo:${user.user_id}:cost-mgmt`,
+        schemaVersion: 'v2-mongo',
+      });
+    }
+
     const container = await ensureAppContainer(user.user_id, appName);
 
     return NextResponse.json({

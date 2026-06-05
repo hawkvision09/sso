@@ -22,8 +22,8 @@ export async function POST(
     const resolved = await resolveCateringRequestContext(request);
     if (!resolved.ok) return resolved.response;
 
-    const { accessToken, spreadsheetId } = resolved.context;
-    const service = new CateringService(accessToken, spreadsheetId);
+    const { userId } = resolved.context;
+    const service = new CateringService(userId);
 
     const result = await service.saveProposalVersion(id, menuItems, Number(totalPrice || 0), 'Client');
 
@@ -33,8 +33,9 @@ export async function POST(
       versionNumber: result.versionNumber,
       message: 'Menu selection saved successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save proposal version:', error);
-    return NextResponse.json({ error: `Failed to save menu selection: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to save menu selection: ${message}` }, { status: 500 });
   }
 }

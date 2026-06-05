@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     try {
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { accessToken, spreadsheetId } = resolved.context;
+        const { userId } = resolved.context;
 
         const searchParams = request.nextUrl.searchParams;
         const userEmail = searchParams.get('userEmail') || undefined;
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         const orderAmountParam = searchParams.get('orderAmount');
         const orderAmount = orderAmountParam ? Number(orderAmountParam) : undefined;
 
-        const couponService = new CouponService(accessToken, spreadsheetId);
+        const couponService = new CouponService(userId);
         const coupons = await couponService.getApplicableCoupons({
             userEmail,
             userType,
@@ -26,8 +26,9 @@ export async function GET(request: NextRequest) {
         });
 
         return NextResponse.json({ coupons, total: coupons.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to fetch applicable coupons:', error);
-        return NextResponse.json({ error: `Failed to fetch applicable coupons: ${error.message}` }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Failed to fetch applicable coupons: ${message}` }, { status: 500 });
     }
 }

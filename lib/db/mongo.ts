@@ -30,6 +30,6 @@ export async function getMongoClient(): Promise<MongoClient> {
 
 export async function getMongoDb(databaseName = MONGODB_DEFAULT_DB): Promise<Db> {
   const client = await getMongoClient();
-  const finalDbName = dbNameWithEnv(databaseName || MONGODB_DEFAULT_DB_LOCAL);
+  const finalDbName = dbNameWithEnv(databaseName);
   return client.db(finalDbName);
 }
