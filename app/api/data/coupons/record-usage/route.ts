@@ -6,10 +6,10 @@ export async function POST(request: NextRequest) {
     try {
         const resolved = await resolveCouponRequestContext(request);
         if (!resolved.ok) return resolved.response;
-        const { userId } = resolved.context;
+        const { userId, userEmail: authenticatedEmail } = resolved.context;
 
         const body = await request.json();
-        const { couponCode, userId, userEmail, orderAmount, discountAmount, finalAmount } = body;
+        const { couponCode, userEmail, orderAmount, discountAmount, finalAmount } = body;
 
         if (!couponCode || orderAmount === undefined || discountAmount === undefined) {
             return NextResponse.json(
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         const couponService = new CouponService(userId);
         await couponService.recordCouponUsage(couponCode, {
             userId,
-            userEmail,
+            userEmail: userEmail ?? authenticatedEmail,
             orderAmount: Number(orderAmount),
             discountAmount: Number(discountAmount),
             finalAmount: Number(finalAmount ?? (Number(orderAmount) - Number(discountAmount))),
