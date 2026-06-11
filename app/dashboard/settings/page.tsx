@@ -6,13 +6,14 @@ import AppsDrawer from "../../components/AppsDrawer";
 import DashboardHeader from "../../components/DashboardHeader";
 import PageLayout from "../../components/PageLayout";
 import { getServiceLaunchUrl } from "@/lib/service-launch";
-import { defaultThemeName, themes, type ThemeName, themeCookieName } from "@/lib/theme";
+import { defaultThemeName, resolveThemeName, themes, type ThemeName } from "@/lib/theme";
 
 interface User {
     user_id: string;
     email: string;
     roles: string[];
     status: string;
+    theme?: ThemeName;
 }
 
 interface StorageStatus {
@@ -37,15 +38,6 @@ export default function SettingsPage() {
     useEffect(() => {
         fetchUser();
         fetchServices();
-
-        const cookieTheme = document.cookie
-            .split("; ")
-            .find((entry) => entry.startsWith(`${themeCookieName}=`))
-            ?.split("=")[1];
-
-        if (cookieTheme === "light" || cookieTheme === "dark" || cookieTheme === "blue") {
-            setThemeName(cookieTheme);
-        }
     }, []);
 
     const fetchUser = async () => {
@@ -58,6 +50,7 @@ export default function SettingsPage() {
 
             const data = await response.json();
             setUser(data.user);
+            setThemeName(resolveThemeName(data.user?.theme));
         } catch {
             router.push("/login");
         } finally {
@@ -87,10 +80,30 @@ export default function SettingsPage() {
         }
     };
 
-    const applyTheme = (nextTheme: ThemeName) => {
+    const applyTheme = async (nextTheme: ThemeName) => {
         setThemeName(nextTheme);
-        document.cookie = `${themeCookieName}=${nextTheme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
-        window.location.reload();
+
+        try {
+            const response = await fetch("/api/auth/theme", {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ theme: nextTheme }),
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to save theme");
+            }
+
+            setUser((currentUser) => (
+                currentUser ? { ...currentUser, theme: nextTheme } : currentUser
+            ));
+            router.refresh();
+        } catch (error) {
+            console.error("Theme update failed:", error);
+            setThemeName(user?.theme ?? defaultThemeName);
+        }
     };
 
     if (loading) {
@@ -157,7 +170,7 @@ export default function SettingsPage() {
                                 Choose your theme
                             </h4>
                             <p className="mt-1 text-sm text-[var(--theme-muted)]">
-                                This preference is saved in your browser and applies without restarting.
+                                This preference is saved to your account and follows you across supported services.
                             </p>
                         </div>
 
