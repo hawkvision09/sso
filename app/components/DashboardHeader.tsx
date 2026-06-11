@@ -105,7 +105,7 @@ export default function DashboardHeader({
                         className="flex cursor-pointer items-center justify-center gap-3 text-left transition-opacity hover:opacity-90"
                         aria-label="Go to dashboard"
                     >
-                        <span className="text-2xl">🔐</span>
+                        <span className="text-2xl"><img src="/woxin-logo.svg" alt="Icon" width="36" height="36" /></span>
                         <h1 className="text-xl font-semibold text-[var(--theme-text)] md:text-xl">{title}</h1>
                     </button>
                 </div>

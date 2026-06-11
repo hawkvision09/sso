@@ -14,7 +14,7 @@ export const SHEET_NAMES = {
 };
 
 const HEADERS = {
-  [SHEET_NAMES.USERS]: ['user_id', 'email', 'role', 'created_at', 'status'],
+  [SHEET_NAMES.USERS]: ['user_id', 'email', 'role', 'created_at', 'status', 'theme'],
   [SHEET_NAMES.SESSIONS]: ['session_id', 'user_id', 'created_at', 'expires_at', 'last_active_at', 'last_login_at', 'devices_json'],
   [SHEET_NAMES.AUTH_TOKENS]: ['user_id', 'session_id', 'token_value', 'token_hash', 'status', 'issued_at', 'expires_at', 'created_at', 'updated_at'],
   [SHEET_NAMES.SERVICES]: ['service_id', 'name', 'description', 'redirect_url', 'free_tier_enabled', 'image_url'],

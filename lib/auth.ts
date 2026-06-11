@@ -14,6 +14,7 @@ import { initializeSheets } from '@/lib/sheets';
 import type { DeviceContext } from '@/lib/device';
 import { revokeAuthTokensBySessionId } from '@/lib/authTokens';
 import { getMongoDb } from '@/lib/db/mongo';
+import { defaultThemeName, resolveThemeName, type ThemeName } from '@/lib/theme';
 
 export interface User {
   user_id: string;
@@ -21,6 +22,7 @@ export interface User {
   roles: string[]; // Changed from single role to array
   created_at: string;
   status: 'active' | 'suspended';
+  theme: ThemeName;
 }
 
 export interface Session {
@@ -85,6 +87,7 @@ function mapMongoUser(doc: any): User {
     roles,
     created_at: doc?.created_at || '',
     status: (doc?.status || 'active') as 'active' | 'suspended',
+    theme: resolveThemeName(doc?.theme),
   };
 }
 
@@ -245,6 +248,7 @@ export async function getOrCreateUser(email: string): Promise<User> {
       roles: ['user'],
       created_at: new Date().toISOString(),
       status: 'active',
+      theme: defaultThemeName,
     };
 
     await users.insertOne(newUser as any);
@@ -262,6 +266,7 @@ export async function getOrCreateUser(email: string): Promise<User> {
       roles: ['user'], // Default role as array
       created_at: new Date().toISOString(),
       status: 'active',
+      theme: defaultThemeName,
     };
     
     await appendRow(SHEET_NAMES.USERS, [
@@ -270,6 +275,7 @@ export async function getOrCreateUser(email: string): Promise<User> {
       newUser.roles.join(','), // Store as comma-separated string
       newUser.created_at,
       newUser.status,
+      newUser.theme,
     ]);
     
     return newUser;
@@ -280,6 +286,7 @@ export async function getOrCreateUser(email: string): Promise<User> {
   return {
     ...userData,
     roles: userData.role ? userData.role.split(',').map((r: string) => r.trim()) : ['user'],
+    theme: resolveThemeName(userData.theme),
   } as User;
 }
 
@@ -472,7 +479,52 @@ export async function getUserById(userId: string): Promise<User | null> {
   return {
     ...userData,
     roles: userData.role ? userData.role.split(',').map((r: string) => r.trim()) : ['user'],
+    theme: resolveThemeName(userData.theme),
   } as User;
+}
+
+export async function updateUserTheme(userId: string, theme: ThemeName): Promise<User | null> {
+  if (AUTH_CORE_BACKEND === 'mongo') {
+    const { users } = await getCoreAuthCollections();
+    await users.updateOne(
+      { user_id: userId },
+      { $set: { theme } }
+    );
+
+    const updatedUser = await users.findOne({ user_id: userId });
+    return updatedUser ? mapMongoUser(updatedUser) : null;
+  }
+
+  const rowIndex = await findRowIndexByColumn(SHEET_NAMES.USERS, 'user_id', userId);
+  if (rowIndex === -1) {
+    return null;
+  }
+
+  const user = await findRowByColumn(SHEET_NAMES.USERS, 'user_id', userId);
+  if (!user) {
+    return null;
+  }
+
+  const userData = user as any;
+  const updatedUser: User = {
+    user_id: userData.user_id || '',
+    email: userData.email || '',
+    roles: userData.role ? userData.role.split(',').map((r: string) => r.trim()) : ['user'],
+    created_at: userData.created_at || '',
+    status: (userData.status || 'active') as 'active' | 'suspended',
+    theme,
+  };
+
+  await updateRow(SHEET_NAMES.USERS, `A${rowIndex + 1}`, [
+    updatedUser.user_id,
+    updatedUser.email,
+    updatedUser.roles.join(','),
+    updatedUser.created_at,
+    updatedUser.status,
+    updatedUser.theme,
+  ]);
+
+  return updatedUser;
 }
 
 // Logout - delete session
