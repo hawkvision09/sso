@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 
 export type ThemeName = "light" | "dark" | "blue";
 export const themeCookieName = "woxin_theme";
+export const themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 
 type ThemeStyle = CSSProperties & Record<`--theme-${string}`, string>;
 
@@ -143,6 +144,28 @@ export function resolveActiveThemeName(preference?: string): ThemeName {
 
 export const defaultThemeName: ThemeName = resolveThemeName(process.env.NEXT_PUBLIC_THEME);
 export const defaultTheme = themes[defaultThemeName];
+
+export function getThemeCookieDomain(): string | undefined {
+    const domain = process.env.THEME_COOKIE_DOMAIN?.trim();
+    return domain ? domain : undefined;
+}
+
+export function getThemeCookieOptions(themeName: ThemeName) {
+    const domain = getThemeCookieDomain();
+
+    return {
+        name: themeCookieName,
+        value: themeName,
+        options: {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax" as const,
+            maxAge: themeCookieMaxAgeSeconds,
+            path: "/",
+            ...(domain ? { domain } : {}),
+        },
+    };
+}
 
 export function getThemeStyle(theme: ThemeTokens = defaultTheme): ThemeStyle {
     return {

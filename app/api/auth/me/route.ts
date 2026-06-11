@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         email: user.email,
         roles: user.roles, // Changed from role to roles
         status: user.status,
+        theme: user.theme,
       },
     });
   } catch (error: any) {

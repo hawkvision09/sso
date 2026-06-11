@@ -3,6 +3,7 @@ import { verifyOTP } from '@/lib/otp';
 import { getOrCreateUser, createSession, generateToken } from '@/lib/auth';
 import { resolveDeviceContext } from '@/lib/device';
 import { getReusableAuthToken, persistAuthTokenRecord } from '@/lib/authTokens';
+import { defaultThemeName, getThemeCookieOptions, resolveThemeName } from '@/lib/theme';
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
       maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/',
     });
+
+    const persistedTheme = resolveThemeName(user.theme || defaultThemeName);
+    const themeCookie = getThemeCookieOptions(persistedTheme);
+    response.cookies.set(themeCookie.name, themeCookie.value, themeCookie.options);
     
     return response;
   } catch (error: any) {

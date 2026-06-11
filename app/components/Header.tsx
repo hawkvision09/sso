@@ -16,7 +16,6 @@ interface HeaderProps {
 
 export default function Header({
   title,
-  icon = "🔐",
   user,
   showUserInfo = false,
   onLogout,
@@ -27,7 +26,7 @@ export default function Header({
   return (
     <header className="flex items-center justify-between border-b border-[var(--theme-border)] bg-[var(--theme-surface)] px-12 py-6 backdrop-blur-2xl">
       <div className="flex items-center gap-3">
-        <span className="text-4xl">{icon}</span>
+        <span className="text-4xl">{<img src="/woxin-logo.svg" alt="Icon" />}</span>
         <h1 className="text-2xl font-bold text-[var(--theme-text)]">{title}</h1>
       </div>
 
