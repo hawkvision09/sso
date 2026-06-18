@@ -108,6 +108,7 @@ export default function DashboardPage() {
         }))}
         adminServicesHref="/admin"
         adminUsersHref="/admin/users"
+        isAdmin={user?.roles.includes("admin") ?? false}
       />
 
       <main className="mx-auto max-w-7xl px-6 py-10 md:px-12 md:py-12">

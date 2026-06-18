@@ -102,6 +102,7 @@ export default function ProfilePage() {
                 }))}
                 adminServicesHref="/admin"
                 adminUsersHref="/admin/users"
+                isAdmin={user?.roles.includes("admin") ?? false}
             />
 
             <main className="mx-auto max-w-5xl px-6 py-12 md:px-12">

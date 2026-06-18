@@ -15,6 +15,7 @@ interface AppsDrawerProps {
   apps: AppsDrawerItem[];
   adminServicesHref: string;
   adminUsersHref: string;
+  isAdmin?: boolean;
 }
 
 export default function AppsDrawer({
@@ -23,6 +24,7 @@ export default function AppsDrawer({
   apps,
   adminServicesHref,
   adminUsersHref,
+  isAdmin = false,
 }: AppsDrawerProps) {
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -94,45 +96,47 @@ export default function AppsDrawer({
           </div>
         </div>
 
-        <div className="relative mt-5 border-t border-[var(--theme-border)] pt-4">
-          <button
-            ref={adminTriggerRef}
-            type="button"
-            onClick={() => setIsAdminMenuOpen((current) => !current)}
-            className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm text-[var(--theme-text)] transition-all hover:bg-[var(--theme-surface-soft)]"
-            aria-expanded={isAdminMenuOpen}
-            aria-haspopup="menu"
-          >
-            <span>Admin</span>
-            <span className="text-[var(--theme-muted)]">
-              <MdKeyboardArrowRight size={16} />
-            </span>
-          </button>
-
-          {isAdminMenuOpen && (
-            <div
-              ref={adminMenuRef}
-              className="absolute left-full bottom-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 shadow-[var(--theme-shadow)]"
+        {isAdmin && (
+          <div className="relative mt-5 border-t border-[var(--theme-border)] pt-4">
+            <button
+              ref={adminTriggerRef}
+              type="button"
+              onClick={() => setIsAdminMenuOpen((current) => !current)}
+              className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm text-[var(--theme-text)] transition-all hover:bg-[var(--theme-surface-soft)]"
+              aria-expanded={isAdminMenuOpen}
+              aria-haspopup="menu"
             >
-              <div className="space-y-2">
-                <a
-                  href={adminServicesHref}
-                  className="block rounded-xl px-4 py-3 text-sm text-[var(--theme-text)] transition-all hover:bg-[var(--theme-surface-soft)]"
-                  onClick={handleClose}
-                >
-                  Services
-                </a>
-                <a
-                  href={adminUsersHref}
-                  className="block rounded-xl px-4 py-3 text-sm text-[var(--theme-text)] transition-all hover:bg-[var(--theme-surface-soft)]"
-                  onClick={handleClose}
-                >
-                  Users
-                </a>
+              <span>Admin</span>
+              <span className="text-[var(--theme-muted)]">
+                <MdKeyboardArrowRight size={16} />
+              </span>
+            </button>
+
+            {isAdminMenuOpen && (
+              <div
+                ref={adminMenuRef}
+                className="absolute left-full bottom-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 shadow-[var(--theme-shadow)]"
+              >
+                <div className="space-y-2">
+                  <a
+                    href={adminServicesHref}
+                    className="block rounded-xl px-4 py-3 text-sm text-[var(--theme-text)] transition-all hover:bg-[var(--theme-surface-soft)]"
+                    onClick={handleClose}
+                  >
+                    Services
+                  </a>
+                  <a
+                    href={adminUsersHref}
+                    className="block rounded-xl px-4 py-3 text-sm text-[var(--theme-text)] transition-all hover:bg-[var(--theme-surface-soft)]"
+                    onClick={handleClose}
+                  >
+                    Users
+                  </a>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </aside>
     </div>
   );
