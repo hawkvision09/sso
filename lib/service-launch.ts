@@ -4,7 +4,11 @@ type ServiceLike = {
 };
 
 function isDevelopmentEnvironment(): boolean {
-  return (process.env.APP_ENV || "dev").trim().toLowerCase() !== "prd";
+  const env = process.env.NEXT_PUBLIC_APP_ENV || process.env.APP_ENV;
+  if (env) {
+    return env.trim().toLowerCase() !== "prd";
+  }
+  return process.env.NODE_ENV !== "production";
 }
 
 function getConfiguredAppBaseUrl(serviceName: string): string | null {
@@ -25,32 +29,10 @@ function getConfiguredAppBaseUrl(serviceName: string): string | null {
   return null;
 }
 
-function getLocalAppBaseUrl(serviceName: string): string | null {
-  const normalized = serviceName.toLowerCase();
-
-  if (!isDevelopmentEnvironment()) {
-    return getConfiguredAppBaseUrl(serviceName);
-  }
-
-  if (normalized.includes("coupon")) {
-    return process.env.NEXT_PUBLIC_COUPONS_APP_URL || "http://localhost:3001";
-  }
-
-  if (normalized.includes("cater")) {
-    return process.env.NEXT_PUBLIC_CATERING_APP_URL || "http://localhost:3002";
-  }
-
-  if (normalized.includes("cost") || normalized.includes("mgmt")) {
-    return process.env.NEXT_PUBLIC_COST_MGMT_APP_URL || "http://localhost:3003";
-  }
-
-  return getConfiguredAppBaseUrl(serviceName);
-}
-
 export function getServiceLaunchUrl(service: ServiceLike): string {
-  const localBaseUrl = getLocalAppBaseUrl(service.name);
-  if (localBaseUrl) {
-    return localBaseUrl.replace(/\/$/, "");
+  const configuredBaseUrl = getConfiguredAppBaseUrl(service.name);
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, "");
   }
 
   if (service.redirect_url) {
@@ -69,10 +51,10 @@ export function getActivityEntityUrl(
   path: string,
   options: { serviceRedirectUrl?: string } = {},
 ): string {
-  const localOrConfiguredBaseUrl = getLocalAppBaseUrl(serviceName);
+  const configuredBaseUrl = getConfiguredAppBaseUrl(serviceName);
 
-  if (localOrConfiguredBaseUrl) {
-    return `${localOrConfiguredBaseUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  if (configuredBaseUrl) {
+    return `${configuredBaseUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
   }
 
   if (options.serviceRedirectUrl) {
