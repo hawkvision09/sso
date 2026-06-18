@@ -105,6 +105,7 @@ export default function AdminLayout({
         }))}
         adminServicesHref="/admin"
         adminUsersHref="/admin/users"
+        isAdmin={user?.roles.includes("admin") ?? false}
       />
 
       {children}
