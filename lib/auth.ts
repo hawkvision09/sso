@@ -246,10 +246,7 @@ export async function updateUserRole(userId: string, role: string, action: 'add'
     throw new Error('User not found');
   }
 
-  let currentRoles = targetUser.roles || [];
-  if (typeof targetUser.role === 'string' && currentRoles.length === 0) {
-    currentRoles = targetUser.role.split(',').map((r: string) => r.trim());
-  }
+  let currentRoles = targetUser.roles ? [...targetUser.roles] : [];
   if (currentRoles.length === 0) {
     currentRoles = ['user'];
   }
