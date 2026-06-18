@@ -232,6 +232,48 @@ function getUpdatedDevicesJson(
   return serializeDevices(upsertActiveDevice(currentDevices, nextDevice));
 }
 
+export async function getAllUsers(): Promise<User[]> {
+  const { users } = await getCoreAuthCollections();
+  const allUsersDocs = await users.find({}).toArray();
+  return allUsersDocs.map(mapMongoUser);
+}
+
+export async function updateUserRole(userId: string, role: string, action: 'add' | 'remove'): Promise<User> {
+  const { users } = await getCoreAuthCollections();
+  const targetUser = await users.findOne({ user_id: userId });
+  
+  if (!targetUser) {
+    throw new Error('User not found');
+  }
+
+  let currentRoles = targetUser.roles || [];
+  if (typeof targetUser.role === 'string' && currentRoles.length === 0) {
+    currentRoles = targetUser.role.split(',').map((r: string) => r.trim());
+  }
+  if (currentRoles.length === 0) {
+    currentRoles = ['user'];
+  }
+
+  if (action === 'add') {
+    if (!currentRoles.includes(role)) {
+      currentRoles.push(role);
+    }
+  } else {
+    currentRoles = currentRoles.filter((r: string) => r !== role);
+    if (currentRoles.length === 0) {
+      currentRoles = ['user'];
+    }
+  }
+
+  await users.updateOne(
+    { user_id: userId },
+    { $set: { roles: currentRoles } }
+  );
+
+  const updatedUser = await users.findOne({ user_id: userId });
+  return mapMongoUser(updatedUser);
+}
+
 // Create or get user
 export async function getOrCreateUser(email: string): Promise<User> {
   if (AUTH_CORE_BACKEND === 'mongo') {
