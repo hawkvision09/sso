@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUserFromRequest } from '@/lib/session';
-import { getRows, updateRow, findRowIndexByColumn, SHEET_NAMES } from '@/lib/sheets';
+import { getAllUsers, updateUserRole } from '@/lib/auth';
 
 // Helper to check if user has admin role (handles both old and new token formats)
 function hasAdminRole(roles: string[] | undefined, legacyRole?: string): boolean {
@@ -19,14 +19,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    // Get all users
-    const rawUsers = await getRows(SHEET_NAMES.USERS);
-    
-    // Parse roles for each user
-    const users = rawUsers.map(u => ({
-      ...u,
-      roles: u.role ? u.role.split(',').map((r: string) => r.trim()) : ['user'],
-    }));
+    const users = await getAllUsers();
 
     return NextResponse.json({ users });
   } catch (error: any) {
@@ -62,58 +55,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot remove your own admin role' }, { status: 400 });
     }
 
-    // Find the user row
-    const rowIndex = await findRowIndexByColumn(SHEET_NAMES.USERS, 'user_id', userId);
-    if (rowIndex === -1) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Get current user data
-    const users = await getRows(SHEET_NAMES.USERS);
-    const targetUser = users.find(u => u.user_id === userId);
-    
-    if (!targetUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Parse current roles
-    let currentRoles = targetUser.role ? targetUser.role.split(',').map((r: string) => r.trim()) : ['user'];
-    
-    // Add or remove role
-    if (action === 'add') {
-      if (!currentRoles.includes(role)) {
-        currentRoles.push(role);
-      }
-    } else {
-      currentRoles = currentRoles.filter((r: string) => r !== role);
-      // Ensure at least 'user' role remains
-      if (currentRoles.length === 0) {
-        currentRoles = ['user'];
-      }
-    }
-
-    // Update the roles
-    const updatedRow = [
-      targetUser.user_id,
-      targetUser.email,
-      currentRoles.join(','), // Store as comma-separated string
-      targetUser.created_at,
-      targetUser.status,
-    ];
-
-    const rowNumber = rowIndex + 1; // Convert to 1-based for Sheets API
-    await updateRow(SHEET_NAMES.USERS, `A${rowNumber}:E${rowNumber}`, updatedRow);
+    const updatedUser = await updateUserRole(userId, role, action);
 
     return NextResponse.json({ 
       success: true, 
       message: `Role ${action === 'add' ? 'added' : 'removed'} successfully`,
-      user: {
-        user_id: targetUser.user_id,
-        email: targetUser.email,
-        roles: currentRoles,
-        created_at: targetUser.created_at,
-        status: targetUser.status,
-      }
+      user: updatedUser
     });
   } catch (error: any) {
     console.error('Error updating user role:', error);
